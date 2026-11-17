@@ -10,6 +10,10 @@ describe("dashboard", () => {
   expect(source).toContain("Publishing queue");
   expect(source).toContain('id="login-form"');
   expect(source).toContain('id="newSource"');
+  expect(source).toContain('class="workspace-panels"');
+  expect(source).toContain('id="queue-paging"');
+  expect(source).toContain('height:100dvh');
+  expect(source).toContain('overflow:hidden');
  });
  it("client-side JavaScript parses without syntax errors", () => {
   expect(script).toBeTruthy();
