@@ -177,7 +177,7 @@ const page=`<!doctype html>
 .brand{display:flex;gap:11px;align-items:center;font-size:17px;font-weight:680;letter-spacing:-.7px;padding:1px 12px}
 .brand-icon{height:27px;width:27px;display:grid;place-items:center;background:var(--ink);color:#fff;border-radius:9px;font-size:17px}
 .nav{display:grid;gap:4px}.nav a{display:flex;gap:11px;align-items:center;padding:12px;border-radius:9px;color:#656a64;font-weight:520;font-size:13px}.nav a.active{background:#e9eee9;color:var(--accent)}.nav svg,.mini svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.side-bottom{margin-top:auto;padding:12px;color:var(--muted);font-size:11px;line-height:1.8}
+.side-bottom{display:none}
 .content{padding:36px clamp(22px,5.5vw,78px) 70px;min-width:0}
 .top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:58px}.crumb{font-size:12px;color:var(--muted)}.top-actions{display:flex;align-items:center;gap:12px}.online{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#607967}.dot{height:7px;width:7px;border-radius:50%;background:#7da18b}
 .icon-button{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:#555b55}.icon-button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -268,11 +268,11 @@ const page=`<!doctype html>
     <a href="#sources-section"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4.9 4.9a10 10 0 0 1 14.2 14.2M2 9a13 13 0 0 1 13 13"/></svg><span>Sources</span></a>
     <a href="#queue-section"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg><span>Queue</span></a>
   </nav>
-  <div class="side-bottom">AUTOMATED PUBLISHING<br>PERSONAL WORKSPACE</div>
+  <div class="side-bottom"></div>
 </aside>
 <main class="content" id="overview">
-  <div class="top"><div class="crumb">Workspace <span style="margin:0 8px">/</span> <span id="crumb-current">Overview</span></div><div class="top-actions"><span class="online"><span class="dot"></span> Worker online</span><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
-  <div class="heading"><div><h1 id="page-title">Overview</h1><p class="sub">発信するものを、ひとつの場所で。</p></div><button class="secondary" id="check-now">更新を確認</button></div>
+  <div class="top"><div class="crumb"><span id="crumb-current">Overview</span></div><div class="top-actions"><span class="online"><span class="dot"></span> Worker online</span><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
+  <div class="heading"><div><h1 id="page-title">Overview</h1><p class="sub">GitHub・RSSの更新と投稿を管理</p></div><button class="secondary" id="check-now">更新を確認</button></div>
   <p id="notice" role="status" aria-live="polite"></p>
   <div class="stats">
     <div class="stat"><div class="stat-label">監視ソース</div><strong id="stat-sources">—</strong></div>
@@ -292,13 +292,13 @@ const page=`<!doctype html>
     </form></div>
   </section>
   </div>
-  <div class="footer"><span>Broadcast · Personal publishing dashboard</span><span>GitHub & RSS → X & Instagram</span></div>
+  <div class="footer"><span>Broadcast</span><span></span></div>
 </main>
 </div>
 <div class="lock" id="lock"><div class="login">
   <div class="brand"><span class="brand-icon">↗</span>broadcast</div>
-  <h2>Welcome back.</h2><p>管理トークンを入力して、ダッシュボードにアクセスします。トークンは保存されず、この画面を開いている間だけ保持されます。</p>
-  <form id="login-form"><div class="field"><label for="token">ADMIN TOKEN</label><input id="token" type="password" autocomplete="off" required placeholder="管理トークン"></div><button class="primary" id="login-button" type="submit">ダッシュボードを開く</button></form>
+  <h2>管理画面</h2><p>管理トークンを入力してください。</p>
+  <form id="login-form"><div class="field"><label for="token">ADMIN TOKEN</label><input id="token" type="password" autocomplete="off" required placeholder="管理トークン"></div><button class="primary" id="login-button" type="submit">ログイン</button></form>
   <p id="login-message" role="alert"></p>
 </div></div>
 <script>
@@ -329,7 +329,7 @@ function renderSources(sources){
  allSources=sources;const panel=$("sources");panel.replaceChildren();
  const size=desktop()?4:Infinity;if(sourcePage*size>=sources.length)sourcePage=0;
  pageControls("sources-paging",sources.length,sourcePage,size,n=>{sourcePage=n;renderSources(allSources);});
- if(!sources.length){const empty=el("div","empty");empty.append(el("strong",null,"まだソースがありません"),el("span",null,"下のフォームからGitHubやRSSを追加できます。"));panel.append(empty);return;}
+ if(!sources.length){const empty=el("div","empty");empty.append(el("strong",null,"監視ソースはありません"),el("span",null,""));panel.append(empty);return;}
  for(const s of sources.slice(sourcePage*size,sourcePage*size+size)){
    const row=el("div","list-row");const ico=el("div","source-icon",s.type==="github"?"⌘":"↗");
    const rec=el("div","record");rec.append(el("div","record-title",s.name));
@@ -345,7 +345,7 @@ function renderQueue(items){
  allDeliveries=items;const panel=$("deliveries");panel.replaceChildren();
  const size=desktop()?(view()==="queue"?5:3):Infinity;if(queuePage*size>=items.length)queuePage=0;
  pageControls("queue-paging",items.length,queuePage,size,n=>{queuePage=n;renderQueue(allDeliveries);});
- if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"まだ投稿はありません"),el("span",null,"更新が見つかるとここに表示されます。"));panel.append(empty);return;}
+ if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"投稿はありません"),el("span",null,""));panel.append(empty);return;}
  for(const d of items.slice(queuePage*size,queuePage*size+size)){
   const item=el("div","delivery");const top=el("div","delivery-top");
   const platform=el("div","platform",d.platform==="x"?"𝕏":"◎");platform.title=d.platform;
@@ -383,7 +383,7 @@ $("login-form").addEventListener("submit",async ev=>{
  const btn=$("login-button");btn.disabled=true;btn.textContent="認証中…";$("login-message").textContent="";
  try{await load();$("lock").classList.add("hidden");$("token").value="";}
  catch(e){$("login-message").textContent=String(e);}
- finally{btn.disabled=false;btn.textContent="ダッシュボードを開く";}
+ finally{btn.disabled=false;btn.textContent="ログイン";}
 });
 $("refresh").addEventListener("click",()=>{if(!token)return;load().catch(()=>{});});
 $("check-now").addEventListener("click",async()=>{
