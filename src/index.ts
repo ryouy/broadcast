@@ -1,9 +1,11 @@
 import { XMLParser } from "fast-xml-parser";
+import { authMode, callback, login, logout, sameOrigin, session } from "./auth";
 import { compose, githubSignatureValid, normalizeText, sourceKey } from "./core";
 
 interface Env {
  DB: D1Database;
  ADMIN_TOKEN?: string; GITHUB_WEBHOOK_SECRET?: string;
+ GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; SESSION_SECRET?: string; ALLOWED_EMAILS?: string;
  X_USER_ACCESS_TOKEN?: string; INSTAGRAM_ACCESS_TOKEN?: string; INSTAGRAM_USER_ID?: string;
 }
 type Source={id:string;type:"github"|"rss";name:string;url:string;enabled:number;post_x:number;post_instagram:number;default_image_url:string|null;etag:string|null;last_modified:string|null;initialized:number};
@@ -130,9 +132,13 @@ async function dispatch(env:Env){
  }
 }
 async function admin(req:Request,env:Env,url:URL){
- if(!env.ADMIN_TOKEN)return error("ADMIN_TOKEN not configured",503);
+ const mode=authMode(env);
+ if(mode==="unconfigured")return error("Google OAuth configuration incomplete",503);
+ if(mode==="google"){if(!await session(req,env))return error("Unauthorized",401);}
+ else {if(!env.ADMIN_TOKEN)return error("ADMIN_TOKEN not configured",503);
  const h=req.headers.get("authorization")||"";
- if(h!=="Bearer "+env.ADMIN_TOKEN)return error("Unauthorized",401);
+ if(h!=="Bearer "+env.ADMIN_TOKEN)return error("Unauthorized",401);}
+ if(req.method!=="GET"&&!sameOrigin(req))return error("Invalid request origin",403);
  if(req.method==="POST"&&url.pathname==="/api/check"){await poll(env);return json({ok:true});}
  if(req.method==="GET"&&url.pathname==="/api/status"){
   const counts=await env.DB.prepare("SELECT status,COUNT(*) AS count FROM deliveries GROUP BY status").all();
@@ -271,7 +277,7 @@ const page=`<!doctype html>
   <div class="side-bottom"></div>
 </aside>
 <main class="content" id="overview">
-  <div class="top"><div class="crumb"><span id="crumb-current">Overview</span></div><div class="top-actions"><span class="online"><span class="dot"></span> Worker online</span><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
+  <div class="top"><div class="crumb"><span id="crumb-current">Overview</span></div><div class="top-actions"><span class="online"><span class="dot"></span> Worker online</span><button class="secondary" id="logout" style="display:none">ログアウト</button><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
   <div class="heading"><div><h1 id="page-title">Overview</h1><p class="sub">GitHub・RSSの更新と投稿を管理</p></div><button class="secondary" id="check-now">更新を確認</button></div>
   <p id="notice" role="status" aria-live="polite"></p>
   <div class="stats">
@@ -298,7 +304,8 @@ const page=`<!doctype html>
 <div class="lock" id="lock"><div class="login">
   <div class="brand"><span class="brand-icon">↗</span>broadcast</div>
   <h2>管理画面</h2><p>管理トークンを入力してください。</p>
-  <form id="login-form"><div class="field"><label for="token">ADMIN TOKEN</label><input id="token" type="password" autocomplete="off" required placeholder="管理トークン"></div><button class="primary" id="login-button" type="submit">ログイン</button></form>
+  <button class="primary" id="google-login" type="button" style="display:none">Googleでログイン</button>
+  <form id="login-form" style="display:none"><div class="field"><label for="token">ADMIN TOKEN</label><input id="token" type="password" autocomplete="off" required placeholder="管理トークン"></div><button class="primary" id="login-button" type="submit">ログイン</button></form>
   <p id="login-message" role="alert"></p>
 </div></div>
 <script>
@@ -306,6 +313,7 @@ const page=`<!doctype html>
 "use strict";
 const $=id=>document.getElementById(id);
 let token="";
+let authMethod="token";
 let allSources=[],allDeliveries=[],sourcePage=0,queuePage=0;
 const desktop=()=>window.matchMedia("(min-width:901px)").matches;
 const view=()=>document.body.dataset.view||"overview";
@@ -315,7 +323,8 @@ function pageControls(id,total,page,size,onClick){const p=$(id);p.replaceChildre
 const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=String(txt);return e;};
 function notice(msg,bad=false){$("notice").textContent=msg;$("notice").classList.toggle("error",bad);}
 async function api(path,init={}){
- const r=await fetch(path,{...init,headers:{"authorization":"Bearer "+token,...(init.headers||{})}});
+ const headers={...(authMethod==="token"?{"authorization":"Bearer "+token}:{}),...(init.headers||{})};
+ const r=await fetch(path,{...init,credentials:"same-origin",headers});
  const body=await r.json().catch(()=>null);
  if(!r.ok)throw Error(r.status===401?"認証情報が正しくありません。":r.status===503?"CloudflareのADMIN_TOKEN設定を確認してください。":body?.error||"HTTP "+r.status);
  return body;
@@ -378,6 +387,28 @@ async function act(id,action,title){
 document.body.dataset.view="overview";
 document.querySelectorAll(".nav a").forEach(a=>a.addEventListener("click",ev=>{if(desktop()){ev.preventDefault();const h=a.getAttribute("href");setView(h==="#sources-section"?"sources":h==="#queue-section"?"queue":"overview");}}));
 window.addEventListener("resize",()=>{renderSources(allSources);renderQueue(allDeliveries);});
+async function initAuth(){
+ try{
+  const res=await fetch("/api/auth/config",{cache:"no-store"});const c=await res.json();authMethod=c.mode;
+  if(authMethod==="google"){
+   $("google-login").style.display="block";$("login-form").style.display="none";
+   $("logout").style.display="inline-flex";
+   const check=await fetch("/api/auth/session",{credentials:"same-origin",cache:"no-store"});
+   if(check.ok){await load();$("lock").classList.add("hidden");}
+   const authError=new URL(location.href).searchParams.get("auth_error");
+   if(authError)$("login-message").textContent=authError==="denied"?"このGoogleアカウントは許可されていません。":"Googleログインに失敗しました。もう一度お試しください。";
+  }else if(authMethod==="token"){
+   $("login-form").style.display="block";$("google-login").style.display="none";
+  }else{
+   $("login-message").textContent="Google OAuthの設定が完了していません。管理者に連絡してください。";
+  }
+ }catch(e){$("login-message").textContent="認証設定を読み込めませんでした。";}
+}
+$("google-login").addEventListener("click",()=>{window.location.assign("/auth/google");});
+$("logout").addEventListener("click",async()=>{
+ try{await fetch("/auth/logout",{method:"POST",credentials:"same-origin"});}finally{window.location.assign("/");}
+});
+void initAuth();
 $("login-form").addEventListener("submit",async ev=>{
  ev.preventDefault();token=$("token").value.trim();if(!token)return;
  const btn=$("login-button");btn.disabled=true;btn.textContent="認証中…";$("login-message").textContent="";
