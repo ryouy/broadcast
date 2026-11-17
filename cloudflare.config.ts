@@ -8,11 +8,11 @@ export default defineConfig({
     entrypoint,
     env: {
       DB: bindings.d1({ name: "broadcast-db" }),
-      ADMIN_TOKEN: bindings.secret({ name: "ADMIN_TOKEN" }),
-      GITHUB_WEBHOOK_SECRET: bindings.secret({ name: "GITHUB_WEBHOOK_SECRET" }),
-      X_USER_ACCESS_TOKEN: bindings.secret({ name: "X_USER_ACCESS_TOKEN" }),
-      INSTAGRAM_ACCESS_TOKEN: bindings.secret({ name: "INSTAGRAM_ACCESS_TOKEN" }),
-      INSTAGRAM_USER_ID: bindings.secret({ name: "INSTAGRAM_USER_ID" })
+      ADMIN_TOKEN: bindings.secret(),
+      GITHUB_WEBHOOK_SECRET: bindings.secret(),
+      X_USER_ACCESS_TOKEN: bindings.secret(),
+      INSTAGRAM_ACCESS_TOKEN: bindings.secret(),
+      INSTAGRAM_USER_ID: bindings.secret()
     },
     triggers: [triggers.scheduled({ schedule: "*/15 * * * *" })]
   }
