@@ -8,6 +8,14 @@
 - 承認したジョブのみCronから投稿を試行。初期状態は公開しない
 - 送信結果が不明なら `unknown` に留め、自動再送を避ける
 
+## 現在のCloudflare環境（2026-11-17）
+- Worker: `broadcast`
+- URL: https://broadcast.ryouy.workers.dev/
+- D1: `broadcast-db`（初期SQL適用済み）
+- Cron: `*/15 * * * *`（UTC、15分ごと）
+- Workerの初回デプロイ済み。管理APIは `ADMIN_TOKEN` 未設定により503で拒否されます。
+- **注意:** GitHub Actionsはビルド・疎通のCIのみで、自動デプロイはまだ構成していません。GitHubへの追加コミットが自動で公開URLへ反映されるわけではありません。
+
 ## 事前準備
 Node.js 22.18以降とCloudflare CLI (`cf`) を使用。Cloudflare、X Developer、Meta Developerのアカウントが必要。
 
@@ -20,7 +28,7 @@ cf auth login
 
 ### D1
 `cloudflare.config.ts` に `bindings.d1({ name: "broadcast-db" })` を定義。
-Cloudflare CLIでD1を作成し、`migrations/0001_init.sql` を適用してください（詳細コマンドはインストールした `cf` の `cf --help` / `cf cli search "d1 migrations"` で確認）。本番にマイグレーションを適用するまでAPIは動作しません。
+初期環境は作成・初期SQL適用済みです。新しい環境を作成する場合はCloudflare CLIでD1を作成し、`migrations/0001_init.sql` を適用してください（詳細コマンドはインストールした `cf` の `cf --help` / `cf cli search "d1 migrations"` で確認）。本番にマイグレーションを適用するまでAPIは動作しません。
 
 ### Secrets
 Cloudflare Workers側に次のSecretを設定。値をGitHubへコミットしないこと。
