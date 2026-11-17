@@ -6,7 +6,9 @@ describe("dashboard", () => {
  const source = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
  const script = source.match(/<script>([\s\S]*?)<\/script>/)?.[1];
  it("contains the new dashboard and core controls", () => {
-  expect(source).toContain("Welcome back.");
+  expect(source).toContain("管理画面");
+  expect(source).not.toContain("発信するものを、ひとつの場所で。");
+  expect(source).not.toContain("PERSONAL WORKSPACE");
   expect(source).toContain("Publishing queue");
   expect(source).toContain('id="login-form"');
   expect(source).toContain('id="newSource"');
