@@ -66,8 +66,30 @@ async function pollFeed(env:Env,source:Source){
  await env.DB.prepare("UPDATE sources SET initialized=1,etag=?,last_modified=? WHERE id=?").bind(response.headers.get("etag"),response.headers.get("last-modified"),source.id).run();
 }
 async function poll(env:Env){
- const sources=await env.DB.prepare("SELECT * FROM sources WHERE type='rss' AND enabled=1 LIMIT 15").all<Source>();
- for(const source of sources.results){try{if(!httpUrl(source.url))continue;await pollFeed(env,source);}catch(e){console.error("RSS source failed",source.id,String(e));}}
+ const sources=await env.DB.prepare("SELECT * FROM sources WHERE enabled=1 LIMIT 30").all<Source>();
+ for(const source of sources.results){
+  try{
+   if(!httpUrl(source.url))continue;
+   if(source.type==="rss")await pollFeed(env,source);
+   else if(source.type==="github")await pollGitHub(env,source);
+  }catch(e){console.error("Source poll failed",source.id,String(e));}
+ }
+}
+// Public GitHub Releases API fallback: works without repository webhook admin rights.
+async function pollGitHub(env:Env,source:Source) {
+ const repo=githubRepo(source.url);if(!repo)return;
+ const resp=await fetch("https://api.github.com/repos/"+repo+"/releases?per_page=10",{
+  headers:{"accept":"application/vnd.github+json","user-agent":"broadcast-release-monitor"},
+  signal:AbortSignal.timeout(10000)
+ });
+ if(!resp.ok)throw Error("GitHub releases HTTP "+resp.status);
+ const releases:any=await resp.json();
+ if(!Array.isArray(releases))throw Error("Invalid releases payload");
+ for(const release of releases.slice().reverse()){
+  if(release.draft||release.prerelease||!release.published_at||!release.id)continue;
+  await enqueue(env,source,String(release.id),String(release.name||release.tag_name||repo),
+   String(release.body||""),String(release.html_url||"https://github.com/"+repo+"/releases"),null);
+ }
 }
 async function publishX(env:Env,d:Delivery){
  if(!env.X_USER_ACCESS_TOKEN)throw Error("Missing X_USER_ACCESS_TOKEN");
@@ -111,6 +133,7 @@ async function admin(req:Request,env:Env,url:URL){
  if(!env.ADMIN_TOKEN)return error("ADMIN_TOKEN not configured",503);
  const h=req.headers.get("authorization")||"";
  if(h!=="Bearer "+env.ADMIN_TOKEN)return error("Unauthorized",401);
+ if(req.method==="POST"&&url.pathname==="/api/check"){await poll(env);return json({ok:true});}
  if(req.method==="GET"&&url.pathname==="/api/status"){
   const counts=await env.DB.prepare("SELECT status,COUNT(*) AS count FROM deliveries GROUP BY status").all();
   return json({ok:true,counts:counts.results});
