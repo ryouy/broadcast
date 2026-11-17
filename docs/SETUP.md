@@ -5,7 +5,7 @@
 - GitHub Releases APIの定期監視（Webhook権限がなくても動作）
 - RSS/Atomを15分間隔で確認。最初の読み込みでは過去記事を投稿しない
 - X / Instagram 向けの投稿を独立したキューに登録
-- 管理トークンで投稿を承認またはスキップ
+- Google OAuth（OpenID Connect）でログインし、許可メールアドレスだけが投稿を承認・スキップできる。Google設定前は従来の管理トークンを暫定使用
 - 承認したジョブのみCronから投稿を試行。初期状態は公開しない
 - 送信結果が不明なら `unknown` に留め、自動再送を避ける
 
@@ -14,9 +14,9 @@
 - URL: https://broadcast.ryouy.workers.dev/
 - D1: `broadcast-db`（初期SQL適用済み）
 - Cron: `*/15 * * * *`（UTC、15分ごと）
-- WorkerへGitHub Releases APIの監視実装をデプロイ済み。管理APIは `ADMIN_TOKEN` 未設定により503で拒否されます。
+- GitHub Releases APIの定期監視と、Google OAuth移行用の認証コードを実装済み。Googleのシークレットを全て登録するとGoogleログイン方式に切り替わります。
 - `ryouy/broadcast` は監視ソースとして登録済み。GitHub Release v0.1.0を作成し、初回管理画面表示のためにD1へ一件だけ手動登録済み（自動検知成功の証拠ではありません）。
-- **管理者認証の残作業:** Cloudflare Dashboard → Workers & Pages → `broadcast` → Settings → Variables and Secrets に `ADMIN_TOKEN` をSecretとして追加してください。`openssl rand -base64 32` などで生成した推測困難な値を使用。管理画面で同じ値を入力すると一覧を表示できます。
+- **管理者認証の残作業:** Google CloudでOAuthクライアントを作成し、CloudflareにGoogle認証のSecretを登録する（下記参照）。現在の管理トークンは移行が完了するまでは残します。
 - SNS認証情報は未設定です。検証中は承認ボタンを押さないでください。
 - **注意:** GitHub Actionsはビルド・疎通のCIのみで、自動デプロイはまだ構成していません。GitHubへの追加コミットが自動で公開URLへ反映されるわけではありません。
 
@@ -39,13 +39,28 @@ Cloudflare Workers側に次のSecretを設定。値をGitHubへコミットし�
 
 | 変数 | 必須 | 内容 |
 | --- | --- | --- |
-| `ADMIN_TOKEN` | 必須 | 長いランダムな管理用文字列 |
+| `ADMIN_TOKEN` | Google設定前のみ | 移行用の管理用トークン（Google設定後は使用しません） |
+| `GOOGLE_CLIENT_ID` | Google認証時 | OAuth 2.0 ウェブアプリのClient ID |
+| `GOOGLE_CLIENT_SECRET` | Google認証時 | OAuth 2.0 ウェブアプリのClient Secret |
+| `SESSION_SECRET` | Google認証時 | Cookie署名用のランダム文字列。 `openssl rand -base64 48` 等で生成 |
+| `ALLOWED_EMAILS` | Google認証時 | 管理画面へのログインを許すメールアドレスをカンマ区切りで指定 |
 | `GITHUB_WEBHOOK_SECRET` | GitHub利用時 | GitHub webhookの共通署名鍵 |
 | `X_USER_ACCESS_TOKEN` | X投稿時 | user contextのWrite権限を持つOAuth2アクセストークン |
 | `INSTAGRAM_ACCESS_TOKEN` | IG投稿時 | Instagram LoginのContent Publishing権限を持つトークン |
 | `INSTAGRAM_USER_ID` | IG投稿時 | 対象InstagramプロアカウントのID |
 
-`cf deploy` 後、Workerの公開URLを開いて管理トークンを入力します。管理画面は静的HTMLとして公開されるため、トークンを知らない第三者が管理APIを使うことはできません。ただし本番ではCloudflare Accessによる画面全体の制限を推奨します。WebhookのパスはAccessの対象外にしてください。
+### Google OAuth 設定（Cloudflare Zero Trustは不要）
+
+1. [Google Cloud Console](https://console.cloud.google.com/auth/overview) でプロジェクトを作成・選択し、Google Auth Platformのブランディングおよび対象ユーザーを設定します。個人用途でアプリを「テスト中」にする場合、**テストユーザー**にも自分のGoogleアカウントを追加してください。
+2. **Clients → Create client → Web application** からOAuth 2.0 クライアントを作成します。
+3. 承認済みのリダイレクトURI（完全一致）に `https://broadcast.ryouy.workers.dev/auth/callback` を追加します。JavaScriptオリジンは `https://broadcast.ryouy.workers.dev` を指定できます（サーバーサイド認可コード処理自体には必須ではありません）。
+4. Cloudflare Dashboard → Workers & Pages → `broadcast` → Settings → Variables and Secrets で、`GOOGLE_CLIENT_ID`・`GOOGLE_CLIENT_SECRET`・`SESSION_SECRET`・`ALLOWED_EMAILS` の**4件すべて**を設定します。Secretや許可リストをGitHubに記載しないでください。
+5. 公開画面でGoogleログインが表示され、許可メールアドレスだけがログインできることを確認します。未許可アカウントでも拒否されること、ログアウト後にAPIが401になることを確認してください。
+6. Googleでログインできることを確認してから、不要になった `ADMIN_TOKEN` を削除します。
+
+**移行時の仕様:** 4件とも設定されるまでは管理トークン方式を使用します。ただしGoogle関連変数が一部のみ設定された状態では、不完全なOAuth設定として管理APIを503で拒否します。4件とも設定済みなら管理トークンでは入れません。管理APIのPOSTは同一Originのみ許可します。セッションはHttpOnly・Secure・SameSite=Laxの署名付きCookieで8時間有効。OAuthではstate・nonce・PKCE・Google署名のIDトークン・audience・発行者・メール確認を検証します。
+
+Webhookは `/webhooks/github` に従来どおり署名を要求し、Googleログイン不要で受信できます。
 
 ### GitHub Webhook
 監視したいGitHubリポジトリの `Settings > Webhooks` で以下を指定。
