@@ -2,7 +2,11 @@
 
 GitHub Releases と RSS/Atom の新着を検知して、X と Instagram に投稿する個人用の Cloudflare Workers アプリです。
 
-**現在: 初期MVP（実装途中）。投稿はすべて承認待ちから始まり、無断で自動公開しません。**
+**現在: 初期MVP（検証環境デプロイ済み）。投稿はすべて承認待ちから始まり、無断で自動公開しません。**
+
+**ステージングURL:** https://broadcast.ryouy.workers.dev/
+
+Cloudflare WorkerとD1 `broadcast-db` は作成済みです。管理用・SNS用Secretは未設定のため管理APIはロック状態です。Cloudflare Cronは15分ごとに動作しますが、監視ソースは未登録です。
 
 ## できること
 - GitHub Webhook の署名検証とリリース検知
@@ -23,7 +27,7 @@ npm test
 npm run dev
 ```
 
-Cloudflareリソースの作成・マイグレーション・API鍵設定・Webhook設定・デプロイは未実施です。
+CloudflareのWorker・D1作成、マイグレーション、Cron、初回デプロイは完了しています。管理用・SNS用Secret設定とWebhook登録、実投稿の検証は未実施です。
 
 **設定方法・未対応事項: [docs/SETUP.md](docs/SETUP.md)**
 
