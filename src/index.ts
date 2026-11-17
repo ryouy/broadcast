@@ -165,7 +165,7 @@ async function admin(req:Request,env:Env,url:URL){
 const page=`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Broadcast</title>
 <style>body{font-family:system-ui,-apple-system,sans-serif;background:#fafafa;color:#202124;max-width:960px;margin:48px auto;padding:0 18px}h1{font-weight:650;letter-spacing:-1px}input,select,button{font:inherit;padding:10px;border:1px solid #ccc;border-radius:8px}button{cursor:pointer;background:#fff}button:hover{background:#eee}.panel{background:white;border:1px solid #ddd;padding:22px;border-radius:16px;margin:18px 0}label{display:block;font-size:13px;margin:12px 0 5px;color:#555}input[type=text],input[type=password],input[type=url]{width:min(100%,500px);box-sizing:border-box}.entry{padding:15px 0;border-bottom:1px solid #eee}.muted{color:#777;font-size:13px}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}#message{white-space:pre-wrap;color:#9b2e24}</style>
 <h1>Broadcast</h1><p class="muted">GitHub と RSS の更新を検知して投稿を管理します。公開前に承認が必要です。</p>
-<section class="panel"><label>管理トークン（このタブ内でのみ保持します）</label><input id="token" type="password" autocomplete="off" placeholder="ADMIN_TOKEN"><button id="load">読み込む</button><p id="message"></p></section>
+<section class="panel"><label>管理トークン（このタブ内でのみ保持します）</label><input id="token" type="password" autocomplete="off" placeholder="ADMIN_TOKEN"><button id="load">読み込む</button><p id="message" role="status" aria-live="polite">トークンを入力して「読み込む」を押してください。</p></section>
 <section class="panel"><h2>監視ソースを追加</h2><form id="newSource"><label>種類</label><select id="kind"><option value="github">GitHub Releases</option><option value="rss">RSS / Atom</option></select><label>名前</label><input id="name" type="text" required placeholder="My project"><label>URL</label><input id="url" type="url" required placeholder="https://github.com/owner/repo"><label>Instagram用公開画像URL（任意）</label><input id="image" type="url" placeholder="https://example.com/image.jpg"><p class="row"><label><input id="x" type="checkbox" checked> X</label><label><input id="ig" type="checkbox"> Instagram</label></p><button type="submit">追加する</button></form></section>
 <section class="panel"><h2>監視ソース</h2><div id="sources" class="muted">未読み込み</div></section>
 <section class="panel"><h2>投稿キュー</h2><div id="deliveries" class="muted">未読み込み</div></section>
@@ -175,19 +175,21 @@ let token="";
 function node(tag,text){const el=document.createElement(tag);el.textContent=String(text??"");return el}
 async function api(path,init={}){const r=await fetch(path,{...init,headers:{"authorization":"Bearer "+token,...init.headers}});const j=await r.json();if(!r.ok)throw Error(j.error||r.status);return j}
 async function load(){
-try{const [sources,items]=await Promise.all([api("/api/sources"),api("/api/deliveries")]);$("message").textContent="";
+$("message").textContent="読み込み中です…";$("load").disabled=true;
+try{const [sources,items]=await Promise.all([api("/api/sources"),api("/api/deliveries")]);$("message").textContent="認証しました。監視ソース: "+sources.length+"件、投稿キュー: "+items.length+"件";
 $("sources").replaceChildren(...sources.map(s=>{const div=node("div",s.name+" — "+s.type+" — "+s.url);div.className="entry";return div}));
 $("deliveries").replaceChildren(...items.map(d=>{const div=document.createElement("div");div.className="entry";div.append(node("strong",d.title+" ["+d.platform+"] "),node("span"," — "+d.status));div.append(node("p",d.text));if(d.last_error)div.append(node("p",d.last_error));if(d.status==="pending_review"){for(const action of ["approve","skip"]){const b=node("button",action==="approve"?"承認":"スキップ");b.onclick=async()=>{try{await api("/api/deliveries/"+d.id+"/"+action,{method:"POST"});await load()}catch(e){$("message").textContent=String(e)}};div.append(b)}}return div}));
-}catch(e){$("message").textContent=String(e)}
+}catch(e){$("message").textContent="読み込みに失敗しました: "+String(e)+"。Cloudflare側のADMIN_TOKEN設定を確認してください。"}
+finally{$("load").disabled=false}
 }
-$("load").onclick=()=>{token=$("token").value;load()};
+$("load").onclick=()=>{token=$("token").value.trim();if(!token){$("message").textContent="管理トークンを入力してください。";return;}void load()};
 $("newSource").onsubmit=async ev=>{ev.preventDefault();try{await api("/api/sources",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:$("kind").value,name:$("name").value,url:$("url").value,default_image_url:$("image").value||null,post_x:$("x").checked,post_instagram:$("ig").checked})});$("newSource").reset();await load()}catch(e){$("message").textContent=String(e)}};
 </script></html>`;
 export default {
  async fetch(req:Request,env:Env):Promise<Response>{
   const url=new URL(req.url);
   try{
-   if(req.method==="GET"&&url.pathname==="/")return new Response(page,{headers:ACCESS_HEADERS});
+   if(req.method==="GET"&&url.pathname==="/")return new Response(env.ADMIN_TOKEN?page:page.replace("トークンを入力して「読み込む」を押してください。","現在CloudflareにADMIN_TOKENが登録されていません。Workers & Pages の broadcast → Settings → Variables and Secrets に Secret を追加してください。"),{headers:ACCESS_HEADERS});
    if(req.method==="POST"&&url.pathname==="/webhooks/github")return webhook(req,env);
    if(url.pathname.startsWith("/api/"))return admin(req,env,url);
    return error("Not found",404);
