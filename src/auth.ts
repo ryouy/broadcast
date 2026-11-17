@@ -18,7 +18,7 @@ const utf8 = (secret: string) => new TextEncoder().encode(secret);
 const random = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), x => x.toString(16).padStart(2, "0")).join("");
 const parseCookies = (req: Request) => Object.fromEntries((req.headers.get("cookie") || "").split(";").map(p => p.trim()).filter(Boolean).map(p => { const index = p.indexOf("=");return [p.slice(0,index),p.slice(index+1)]; }));
 const cookie = (name:string,value:string,maxAge:number,path="/") => name+"="+value+"; Path="+path+"; Max-Age="+maxAge+"; HttpOnly; Secure; SameSite=Lax";
-const redirect = (location:string,headers?:HeadersInit) => new Response(null,{status:303,headers:{Location:location,"Cache-Control":"no-store",...headers}});
+const redirect = (location:string,headers?:HeadersInit) => {const h=new Headers(headers);h.set("Location",location);h.set("Cache-Control","no-store");return new Response(null,{status:303,headers:h});};
 
 export function authMode(env:AuthEnv):"google"|"token"|"unconfigured"{
  const anyGoogle = Boolean(env.GOOGLE_CLIENT_ID||env.GOOGLE_CLIENT_SECRET||env.SESSION_SECRET||env.ALLOWED_EMAILS);
