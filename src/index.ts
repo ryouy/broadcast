@@ -162,29 +162,176 @@ async function admin(req:Request,env:Env,url:URL){
  }
  return error("Not found",404);
 }
-const page=`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Broadcast</title>
-<style>body{font-family:system-ui,-apple-system,sans-serif;background:#fafafa;color:#202124;max-width:960px;margin:48px auto;padding:0 18px}h1{font-weight:650;letter-spacing:-1px}input,select,button{font:inherit;padding:10px;border:1px solid #ccc;border-radius:8px}button{cursor:pointer;background:#fff}button:hover{background:#eee}.panel{background:white;border:1px solid #ddd;padding:22px;border-radius:16px;margin:18px 0}label{display:block;font-size:13px;margin:12px 0 5px;color:#555}input[type=text],input[type=password],input[type=url]{width:min(100%,500px);box-sizing:border-box}.entry{padding:15px 0;border-bottom:1px solid #eee}.muted{color:#777;font-size:13px}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}#message{white-space:pre-wrap;color:#9b2e24}</style>
-<h1>Broadcast</h1><p class="muted">GitHub と RSS の更新を検知して投稿を管理します。公開前に承認が必要です。</p>
-<section class="panel"><label>管理トークン（このタブ内でのみ保持します）</label><input id="token" type="password" autocomplete="off" placeholder="ADMIN_TOKEN"><button id="load">読み込む</button><p id="message" role="status" aria-live="polite">トークンを入力して「読み込む」を押してください。</p></section>
-<section class="panel"><h2>監視ソースを追加</h2><form id="newSource"><label>種類</label><select id="kind"><option value="github">GitHub Releases</option><option value="rss">RSS / Atom</option></select><label>名前</label><input id="name" type="text" required placeholder="My project"><label>URL</label><input id="url" type="url" required placeholder="https://github.com/owner/repo"><label>Instagram用公開画像URL（任意）</label><input id="image" type="url" placeholder="https://example.com/image.jpg"><p class="row"><label><input id="x" type="checkbox" checked> X</label><label><input id="ig" type="checkbox"> Instagram</label></p><button type="submit">追加する</button></form></section>
-<section class="panel"><h2>監視ソース</h2><div id="sources" class="muted">未読み込み</div></section>
-<section class="panel"><h2>投稿キュー</h2><div id="deliveries" class="muted">未読み込み</div></section>
+const page=`<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f8f8f6">
+<title>Broadcast — Dashboard</title>
+<style>
+:root{color-scheme:light;--bg:#f8f8f6;--paper:#fff;--ink:#202320;--muted:#858883;--line:#e8e9e5;--soft:#f2f3f0;--accent:#2f5144;--error:#a13d36}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline}
+.shell{max-width:1440px;min-height:100vh;margin:auto;display:grid;grid-template-columns:230px minmax(0,1fr)}
+.sidebar{padding:35px 22px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:50px}
+.brand{display:flex;gap:11px;align-items:center;font-size:17px;font-weight:680;letter-spacing:-.7px;padding:1px 12px}
+.brand-icon{height:27px;width:27px;display:grid;place-items:center;background:var(--ink);color:#fff;border-radius:9px;font-size:17px}
+.nav{display:grid;gap:4px}.nav a{display:flex;gap:11px;align-items:center;padding:12px;border-radius:9px;color:#656a64;font-weight:520;font-size:13px}.nav a.active{background:#e9eee9;color:var(--accent)}.nav svg,.mini svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.side-bottom{margin-top:auto;padding:12px;color:var(--muted);font-size:11px;line-height:1.8}
+.content{padding:36px clamp(22px,5.5vw,78px) 70px;min-width:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:58px}.crumb{font-size:12px;color:var(--muted)}.top-actions{display:flex;align-items:center;gap:12px}.online{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#607967}.dot{height:7px;width:7px;border-radius:50%;background:#7da18b}
+.icon-button{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:#555b55}.icon-button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.heading{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;margin-bottom:34px}h1{font-size:clamp(30px,3.1vw,43px);font-weight:620;letter-spacing:-1.8px;line-height:1.1;margin:0 0 11px}.sub{color:var(--muted);font-size:13px;margin:0;line-height:1.6}
+.primary{background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:10px;padding:11px 16px;font-size:12px;font-weight:600}.primary:hover{background:#363b35}.secondary{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:12px;font-weight:560;color:#474b46}.secondary:hover,.icon-button:hover{background:#f0f1ef}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:42px}.stat{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:21px 23px;min-height:116px}.stat-label{color:#777e77;font-size:12px;margin-bottom:20px}.stat strong{font-size:30px;font-weight:580;letter-spacing:-1.1px;line-height:1}
+.section{margin-bottom:40px;scroll-margin-top:24px}.section-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:0 0 16px}.section-head h2{font-size:17px;font-weight:630;letter-spacing:-.4px;margin:0}.section-meta{font-size:12px;color:var(--muted)}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.list-row{display:flex;gap:15px;align-items:center;padding:20px 22px;border-bottom:1px solid var(--line)}.list-row:last-child{border-bottom:0}
+.source-icon{height:40px;width:40px;flex:0 0 40px;display:grid;place-items:center;border:1px solid var(--line);border-radius:11px;font-size:18px;font-weight:600;background:#fbfbfa}.source-icon svg{height:18px;width:18px}
+.record{min-width:0;flex:1}.record-title{font-weight:600;font-size:13px;line-height:1.4;overflow-wrap:anywhere}.record-sub{color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px;overflow-wrap:anywhere}.record-sub a{text-decoration:underline;text-decoration-color:#cbd0c9;text-underline-offset:3px}
+.end{display:flex;align-items:center;gap:10px;flex-shrink:0}.pill{font-size:11px;color:#68756e;border:1px solid #e2e9e3;background:#f2f6f2;padding:6px 9px;border-radius:99px;white-space:nowrap}.pill.awaiting{background:#faf8ee;border-color:#eee9d2;color:#827648}.pill.failed{background:#fbf1f0;border-color:#f0dfdc;color:#a15549}.pill.muted{background:#f5f5f4;border-color:#ececea;color:#898c87}
+.platform{height:25px;width:25px;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px;font-size:12px;font-weight:650}
+.delivery{padding:20px 22px;border-bottom:1px solid var(--line)}.delivery:last-child{border-bottom:0}.delivery-top{display:flex;align-items:flex-start;gap:12px}.delivery-actions{margin:14px 0 0 37px;display:flex;gap:8px;flex-wrap:wrap}.delivery-copy{font-size:12px;white-space:pre-wrap;color:#656a64;line-height:1.7;margin:9px 0 0;max-width:630px;overflow-wrap:anywhere}.error-note{color:var(--error)}
+.empty{padding:42px 20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.8}.empty strong{display:block;color:var(--ink);font-size:14px;margin-bottom:5px}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:13px;padding:21px 22px}.field{display:grid;gap:7px;min-width:0}.field.full{grid-column:1/-1}.field label{font-size:11px;color:#70766f;font-weight:600}.field input,.field select{height:43px;width:100%;border:1px solid #e4e6e2;background:#fff;border-radius:9px;padding:10px 12px;min-width:0;color:var(--ink);outline:none}.field input:focus,.field select:focus{border-color:#869f8d;box-shadow:0 0 0 3px #eff3ee}
+.form-bottom{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:7px;flex-wrap:wrap}.checks{display:flex;gap:18px;align-items:center}.checks label{display:flex;align-items:center;gap:7px;color:#666d66;font-size:12px}.checks input{accent-color:var(--accent)}
+#notice{min-height:20px;margin:0 0 20px;color:#697c6d;font-size:12px;line-height:1.6}#notice.error{color:var(--error)}
+.lock{position:fixed;inset:0;z-index:9;background:#f8f8f6f7;display:flex;align-items:center;justify-content:center;padding:20px}.lock.hidden{display:none}.login{width:min(100%,408px);background:white;border:1px solid var(--line);border-radius:19px;padding:38px;box-shadow:0 12px 45px #2023200a}.login h2{margin:25px 0 9px;font-size:27px;letter-spacing:-1px;font-weight:630}.login p{font-size:13px;line-height:1.7;color:var(--muted);margin:0 0 24px}.login .primary{height:44px;width:100%;margin-top:13px}.login .field input{height:47px}.login #login-message{min-height:18px;font-size:12px;line-height:1.6;margin:13px 0 0;color:var(--error)}.login .brand{padding:0}
+.footer{margin:36px 0 0;color:#a4a7a1;font-size:11px;display:flex;justify-content:space-between;gap:12px}
+@media(max-width:900px){.shell{grid-template-columns:1fr}.sidebar{padding:16px 20px;border-right:0;border-bottom:1px solid var(--line);display:flex;flex-direction:row;align-items:center;gap:12px}.brand{padding:0}.nav{display:flex;gap:4px;margin-left:auto}.nav a{font-size:12px;padding:10px}.side-bottom{display:none}.content{padding:25px 20px 55px}.top{margin-bottom:36px}}
+@media(max-width:620px){.nav a span{display:none}.nav a{padding:9px}.top{margin-bottom:32px}.heading{align-items:flex-start;flex-direction:column}.stats{gap:8px;margin-bottom:30px}.stat{padding:16px 14px;min-height:96px}.stat-label{font-size:11px;margin-bottom:17px}.stat strong{font-size:26px}.list-row,.delivery{padding:17px 15px}.section{margin-bottom:30px}.settings{padding:17px 15px;grid-template-columns:1fr}.field.full{grid-column:auto}.delivery-actions{margin-left:0}.end{gap:5px}.pill{font-size:10px}.online{font-size:11px}.footer{flex-direction:column}.login{padding:28px}}
+@media(prefers-reduced-motion:no-preference){button,.nav a{transition:background .16s,color .16s}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+  <a href="#overview" class="brand"><span class="brand-icon">↗</span>broadcast</a>
+  <nav class="nav" aria-label="セクション">
+    <a class="active" href="#overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg><span>Overview</span></a>
+    <a href="#sources-section"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4.9 4.9a10 10 0 0 1 14.2 14.2M2 9a13 13 0 0 1 13 13"/></svg><span>Sources</span></a>
+    <a href="#queue-section"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg><span>Queue</span></a>
+  </nav>
+  <div class="side-bottom">AUTOMATED PUBLISHING<br>PERSONAL WORKSPACE</div>
+</aside>
+<main class="content" id="overview">
+  <div class="top"><div class="crumb">Workspace <span style="margin:0 8px">/</span> Overview</div><div class="top-actions"><span class="online"><span class="dot"></span> Worker online</span><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
+  <div class="heading"><div><h1>Overview</h1><p class="sub">発信するものを、ひとつの場所で。</p></div><button class="secondary" id="check-now">更新を確認</button></div>
+  <p id="notice" role="status" aria-live="polite"></p>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">監視ソース</div><strong id="stat-sources">—</strong></div>
+    <div class="stat"><div class="stat-label">承認待ち</div><strong id="stat-pending">—</strong></div>
+    <div class="stat"><div class="stat-label">公開済み</div><strong id="stat-published">—</strong></div>
+  </div>
+  <section class="section" id="sources-section"><div class="section-head"><h2>Sources</h2><span class="section-meta" id="source-count">0 sources</span></div><div class="panel" id="sources"><div class="empty">認証後に表示します。</div></div></section>
+  <section class="section" id="queue-section"><div class="section-head"><h2>Publishing queue</h2><span class="section-meta" id="queue-count">0 posts</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div></section>
+  <section class="section" id="add-section"><div class="section-head"><h2>Add source</h2><span class="section-meta">GitHub / RSS</span></div>
+    <div class="panel"><form class="settings" id="newSource">
+      <div class="field"><label for="kind">種類</label><select id="kind"><option value="github">GitHub Releases</option><option value="rss">RSS / Atom</option></select></div>
+      <div class="field"><label for="name">表示名</label><input id="name" type="text" required maxlength="100" placeholder="My project"></div>
+      <div class="field full"><label for="url">URL</label><input id="url" type="url" required placeholder="https://github.com/owner/repo"></div>
+      <div class="field full"><label for="image">Instagram用画像URL（任意）</label><input id="image" type="url" placeholder="https://example.com/cover.jpg"></div>
+      <div class="form-bottom"><div class="checks"><label><input id="x" type="checkbox" checked>X</label><label><input id="ig" type="checkbox">Instagram</label></div><button type="submit" class="primary" id="add">ソースを追加</button></div>
+    </form></div>
+  </section>
+  <div class="footer"><span>Broadcast · Personal publishing dashboard</span><span>GitHub & RSS → X & Instagram</span></div>
+</main>
+</div>
+<div class="lock" id="lock"><div class="login">
+  <div class="brand"><span class="brand-icon">↗</span>broadcast</div>
+  <h2>Welcome back.</h2><p>管理トークンを入力して、ダッシュボードにアクセスします。トークンは保存されず、この画面を開いている間だけ保持されます。</p>
+  <form id="login-form"><div class="field"><label for="token">ADMIN TOKEN</label><input id="token" type="password" autocomplete="off" required placeholder="管理トークン"></div><button class="primary" id="login-button" type="submit">ダッシュボードを開く</button></form>
+  <p id="login-message" role="alert"></p>
+</div></div>
 <script>
+(function(){
+"use strict";
 const $=id=>document.getElementById(id);
 let token="";
-function node(tag,text){const el=document.createElement(tag);el.textContent=String(text??"");return el}
-async function api(path,init={}){const r=await fetch(path,{...init,headers:{"authorization":"Bearer "+token,...init.headers}});const j=await r.json();if(!r.ok)throw Error(j.error||r.status);return j}
-async function load(){
-$("message").textContent="読み込み中です…";$("load").disabled=true;
-try{const [sources,items]=await Promise.all([api("/api/sources"),api("/api/deliveries")]);$("message").textContent="認証しました。監視ソース: "+sources.length+"件、投稿キュー: "+items.length+"件";
-$("sources").replaceChildren(...sources.map(s=>{const div=node("div",s.name+" — "+s.type+" — "+s.url);div.className="entry";return div}));
-$("deliveries").replaceChildren(...items.map(d=>{const div=document.createElement("div");div.className="entry";div.append(node("strong",d.title+" ["+d.platform+"] "),node("span"," — "+d.status));div.append(node("p",d.text));if(d.last_error)div.append(node("p",d.last_error));if(d.status==="pending_review"){for(const action of ["approve","skip"]){const b=node("button",action==="approve"?"承認":"スキップ");b.onclick=async()=>{try{await api("/api/deliveries/"+d.id+"/"+action,{method:"POST"});await load()}catch(e){$("message").textContent=String(e)}};div.append(b)}}return div}));
-}catch(e){$("message").textContent="読み込みに失敗しました: "+String(e)+"。Cloudflare側のADMIN_TOKEN設定を確認してください。"}
-finally{$("load").disabled=false}
+const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=String(txt);return e;};
+function notice(msg,bad=false){$("notice").textContent=msg;$("notice").classList.toggle("error",bad);}
+async function api(path,init={}){
+ const r=await fetch(path,{...init,headers:{"authorization":"Bearer "+token,...(init.headers||{})}});
+ const body=await r.json().catch(()=>null);
+ if(!r.ok)throw Error(r.status===401?"認証情報が正しくありません。":r.status===503?"CloudflareのADMIN_TOKEN設定を確認してください。":body?.error||"HTTP "+r.status);
+ return body;
 }
-$("load").onclick=()=>{token=$("token").value.trim();if(!token){$("message").textContent="管理トークンを入力してください。";return;}void load()};
-$("newSource").onsubmit=async ev=>{ev.preventDefault();try{await api("/api/sources",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:$("kind").value,name:$("name").value,url:$("url").value,default_image_url:$("image").value||null,post_x:$("x").checked,post_instagram:$("ig").checked})});$("newSource").reset();await load()}catch(e){$("message").textContent=String(e)}};
-</script></html>`;
+function statusName(s){return ({pending_review:"承認待ち",scheduled:"公開待ち",processing:"送信中",published:"公開済み",failed:"失敗",unknown:"要確認",skipped:"スキップ"})[s]||s;}
+function statusClass(s){return s==="pending_review"?"awaiting":s==="unknown"||s==="failed"?"failed":s==="skipped"?"muted":"";}
+function shorten(s,max=75){s=String(s||"");return s.length>max?s.slice(0,max)+"…":s;}
+function renderSources(sources){
+ $("stat-sources").textContent=sources.length;
+ $("source-count").textContent=sources.length+" sources";
+ const panel=$("sources");panel.replaceChildren();
+ if(!sources.length){const empty=el("div","empty");empty.append(el("strong",null,"まだソースがありません"),el("span",null,"下のフォームからGitHubやRSSを追加できます。"));panel.append(empty);return;}
+ for(const s of sources){
+   const row=el("div","list-row");const ico=el("div","source-icon",s.type==="github"?"⌘":"↗");
+   const rec=el("div","record");rec.append(el("div","record-title",s.name));
+   const sub=el("div","record-sub");const a=el("a",null,s.url);a.href=s.url;a.target="_blank";a.rel="noopener noreferrer";sub.append(a);rec.append(sub);
+   const end=el("div","end");end.append(el("span","pill",s.enabled?"Active":"Paused"));
+   row.append(ico,rec,end);panel.append(row);
+ }
+}
+function renderQueue(items){
+ $("queue-count").textContent=items.length+" posts";
+ $("stat-pending").textContent=items.filter(x=>x.status==="pending_review").length;
+ $("stat-published").textContent=items.filter(x=>x.status==="published").length;
+ const panel=$("deliveries");panel.replaceChildren();
+ if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"まだ投稿はありません"),el("span",null,"更新が見つかるとここに表示されます。"));panel.append(empty);return;}
+ for(const d of items){
+  const item=el("div","delivery");const top=el("div","delivery-top");
+  const platform=el("div","platform",d.platform==="x"?"𝕏":"◎");platform.title=d.platform;
+  const rec=el("div","record");rec.append(el("div","record-title",d.title));
+  const sub=el("div","record-sub");const a=el("a",null,d.source_name||"ソースを開く");a.href=d.source_url;a.target="_blank";a.rel="noopener noreferrer";sub.append(a);rec.append(sub);
+  const end=el("div","end");end.append(el("span","pill "+statusClass(d.status),statusName(d.status)));
+  top.append(platform,rec,end);item.append(top);
+  if(d.text)item.append(el("p","delivery-copy",shorten(d.text,280)));
+  if(d.last_error)item.append(el("p","delivery-copy error-note",d.last_error));
+  if(d.status==="pending_review"){
+    const buttons=el("div","delivery-actions");
+    const approve=el("button","secondary","承認する");const skip=el("button","secondary","スキップ");
+    approve.addEventListener("click",()=>act(d.id,"approve",d.title));skip.addEventListener("click",()=>act(d.id,"skip",d.title));
+    buttons.append(approve,skip);item.append(buttons);
+  }
+  panel.append(item);
+ }
+}
+async function load(){
+ notice("データを読み込んでいます…");
+ try{const [sources,items]=await Promise.all([api("/api/sources"),api("/api/deliveries")]);renderSources(sources);renderQueue(items);notice("最終更新: "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));return true;}
+ catch(e){notice("読み込みに失敗しました: "+String(e),true);throw e;}
+}
+async function act(id,action,title){
+ const isApprove=action==="approve";
+ if(!confirm((isApprove?"「"+title+"」を公開キューに送りますか？SNS認証が有効なら次回実行時に投稿されます。":"「"+title+"」をスキップしますか？")))return;
+ try{await api("/api/deliveries/"+encodeURIComponent(id)+"/"+action,{method:"POST"});await load();}
+ catch(e){notice(String(e),true);}
+}
+$("login-form").addEventListener("submit",async ev=>{
+ ev.preventDefault();token=$("token").value.trim();if(!token)return;
+ const btn=$("login-button");btn.disabled=true;btn.textContent="認証中…";$("login-message").textContent="";
+ try{await load();$("lock").classList.add("hidden");$("token").value="";}
+ catch(e){$("login-message").textContent=String(e);}
+ finally{btn.disabled=false;btn.textContent="ダッシュボードを開く";}
+});
+$("refresh").addEventListener("click",()=>{if(!token)return;load().catch(()=>{});});
+$("check-now").addEventListener("click",async()=>{
+ if(!token)return;
+ const b=$("check-now");b.disabled=true;b.textContent="確認中…";
+ try{await api("/api/check",{method:"POST"});await load();notice("更新を確認しました。");}
+ catch(e){notice("更新確認に失敗しました: "+String(e),true);}
+ finally{b.disabled=false;b.textContent="更新を確認";}
+});
+$("newSource").addEventListener("submit",async ev=>{
+ ev.preventDefault();if(!token)return;
+ const b=$("add");b.disabled=true;
+ try{await api("/api/sources",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:$("kind").value,name:$("name").value,url:$("url").value,default_image_url:$("image").value||null,post_x:$("x").checked,post_instagram:$("ig").checked})});$("newSource").reset();await load();notice("ソースを追加しました。");}
+ catch(e){notice("追加できませんでした: "+String(e),true);}
+ finally{b.disabled=false;}
+});
+})();
+</script>
+</body></html>`;
 export default {
  async fetch(req:Request,env:Env):Promise<Response>{
   const url=new URL(req.url);
