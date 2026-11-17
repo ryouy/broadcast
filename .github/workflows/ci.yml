@@ -15,3 +15,10 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - name: Package Worker for deployment verification
+        run: |
+          npx esbuild src/index.ts --bundle --platform=browser --format=esm --target=es2022 --outfile=worker-bundle.js
+          echo BROADCAST_BUNDLE_START
+          base64 -w0 worker-bundle.js
+          echo
+          echo BROADCAST_BUNDLE_END
