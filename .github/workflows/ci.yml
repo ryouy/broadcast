@@ -20,10 +20,3 @@ jobs:
           curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q 'Broadcast'
           status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://broadcast.ryouy.workers.dev/api/status)
           test "$status" = "503"
-      - name: Package deployable Worker
-        run: |
-          npx esbuild src/index.ts --bundle --platform=browser --format=esm --target=es2022 --outfile=worker-bundle.js
-          echo BROADCAST_BUNDLE_START
-          base64 -w0 worker-bundle.js
-          echo
-          echo BROADCAST_BUNDLE_END
