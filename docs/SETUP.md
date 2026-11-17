@@ -2,6 +2,7 @@
 
 ## 現在の機能
 - GitHub `release.published` を署名検証して受信し、登録したリポジトリのイベントのみD1に保存
+- GitHub Releases APIの定期監視（Webhook権限がなくても動作）
 - RSS/Atomを15分間隔で確認。最初の読み込みでは過去記事を投稿しない
 - X / Instagram 向けの投稿を独立したキューに登録
 - 管理トークンで投稿を承認またはスキップ
@@ -13,7 +14,10 @@
 - URL: https://broadcast.ryouy.workers.dev/
 - D1: `broadcast-db`（初期SQL適用済み）
 - Cron: `*/15 * * * *`（UTC、15分ごと）
-- Workerの初回デプロイ済み。管理APIは `ADMIN_TOKEN` 未設定により503で拒否されます。
+- WorkerへGitHub Releases APIの監視実装をデプロイ済み。管理APIは `ADMIN_TOKEN` 未設定により503で拒否されます。
+- `ryouy/broadcast` は監視ソースとして登録済み。GitHub Release v0.1.0を作成し、初回管理画面表示のためにD1へ一件だけ手動登録済み（自動検知成功の証拠ではありません）。
+- **管理者認証の残作業:** Cloudflare Dashboard → Workers & Pages → `broadcast` → Settings → Variables and Secrets に `ADMIN_TOKEN` をSecretとして追加してください。`openssl rand -base64 32` などで生成した推測困難な値を使用。管理画面で同じ値を入力すると一覧を表示できます。
+- SNS認証情報は未設定です。検証中は承認ボタンを押さないでください。
 - **注意:** GitHub Actionsはビルド・疎通のCIのみで、自動デプロイはまだ構成していません。GitHubへの追加コミットが自動で公開URLへ反映されるわけではありません。
 
 ## 事前準備
@@ -51,7 +55,7 @@ Cloudflare Workers側に次のSecretを設定。値をGitHubへコミットし�
 - Secret: `GITHUB_WEBHOOK_SECRET` と同じ値
 - Events: `Releases` のみ
 
-管理画面で同じ `https://github.com/owner/repo` をソース登録します。
+管理画面で同じ `https://github.com/owner/repo` をソース登録します。Webhookを設定できない場合もReleases APIを15分ごとにポーリングします。`ryouy/broadcast` は登録済みです。
 
 ### RSS
 管理画面にRSS/AtomのHTTPS URLを追加。最初の取得は基準点の登録だけで過去記事を一括投稿しません。以後の新着をキューへ登録します。
