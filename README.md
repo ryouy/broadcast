@@ -6,10 +6,11 @@ GitHub Releases と RSS/Atom の新着を検知して、X と Instagram に投�
 
 **ステージングURL:** https://broadcast.ryouy.workers.dev/
 
-Cloudflare WorkerとD1 `broadcast-db` は作成済みです。管理用・SNS用Secretは未設定のため管理APIはロック状態です。Cloudflare Cronは15分ごとに動作しますが、監視ソースは未登録です。
+Cloudflare WorkerとD1 `broadcast-db` は作成済みです。管理用・SNS用Secretは未設定のため管理APIはロック状態です。`ryouy/broadcast` は監視対象としてD1に登録済みで、v0.1.0 Releaseの初回表示確認用データを承認待ちで登録しています（初回は手動登録）。Cloudflare Cronは15分ごとに動作しますが、監視ソースは未登録です。
 
 ## できること
 - GitHub Webhook の署名検証とリリース検知
+- GitHub Releases APIの15分間隔監視（Webhookなしでも利用可能）
 - RSS/Atom 新着検知（15分間隔・初回過去記事スキップ）
 - D1を使ったソース・イベント・SNS別投稿キュー
 - トークンで保護したAPIと最小管理画面
