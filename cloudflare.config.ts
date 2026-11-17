@@ -9,6 +9,10 @@ export default defineConfig({
     env: {
       DB: bindings.d1({ name: "broadcast-db" }),
       ADMIN_TOKEN: bindings.secret(),
+      GOOGLE_CLIENT_ID: bindings.secret(),
+      GOOGLE_CLIENT_SECRET: bindings.secret(),
+      SESSION_SECRET: bindings.secret(),
+      ALLOWED_EMAILS: bindings.secret(),
       GITHUB_WEBHOOK_SECRET: bindings.secret(),
       X_USER_ACCESS_TOKEN: bindings.secret(),
       INSTAGRAM_ACCESS_TOKEN: bindings.secret(),
