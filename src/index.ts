@@ -201,6 +201,62 @@ const page=`<!doctype html>
 @media(max-width:900px){.shell{grid-template-columns:1fr}.sidebar{padding:16px 20px;border-right:0;border-bottom:1px solid var(--line);display:flex;flex-direction:row;align-items:center;gap:12px}.brand{padding:0}.nav{display:flex;gap:4px;margin-left:auto}.nav a{font-size:12px;padding:10px}.side-bottom{display:none}.content{padding:25px 20px 55px}.top{margin-bottom:36px}}
 @media(max-width:620px){.nav a span{display:none}.nav a{padding:9px}.top{margin-bottom:32px}.heading{align-items:flex-start;flex-direction:column}.stats{gap:8px;margin-bottom:30px}.stat{padding:16px 14px;min-height:96px}.stat-label{font-size:11px;margin-bottom:17px}.stat strong{font-size:26px}.list-row,.delivery{padding:17px 15px}.section{margin-bottom:30px}.settings{padding:17px 15px;grid-template-columns:1fr}.field.full{grid-column:auto}.delivery-actions{margin-left:0}.end{gap:5px}.pill{font-size:10px}.online{font-size:11px}.footer{flex-direction:column}.login{padding:28px}}
 @media(prefers-reduced-motion:no-preference){button,.nav a{transition:background .16s,color .16s}}
+
+/* Desktop: one viewport, zero page or panel scrolling. */
+@media (min-width:901px){
+ html,body{width:100%;height:100%;overflow:hidden}
+ .shell{height:100dvh;min-height:0;overflow:hidden;grid-template-columns:205px minmax(0,1fr)}
+ .sidebar{padding:24px 16px;gap:30px;min-height:0}
+ .content{padding:22px clamp(18px,3vw,42px) 16px;height:100dvh;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+ .top{margin-bottom:18px;flex-shrink:0}
+ .heading{margin-bottom:12px;flex-shrink:0}
+ h1{font-size:clamp(27px,2.3vw,35px);margin-bottom:5px}
+ .sub{font-size:12px}
+ #notice{margin:0 0 10px;min-height:16px;flex-shrink:0}
+ .stats{gap:10px;margin-bottom:15px;flex-shrink:0}
+ .stat{min-height:76px;padding:13px 17px}
+ .stat-label{margin-bottom:9px}
+ .stat strong{font-size:26px}
+ .workspace-panels{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:14px;flex:1;min-height:0}
+ .section{margin:0;min-height:0;display:flex;flex-direction:column}
+ .section-head{flex-shrink:0;margin-bottom:9px}
+ .panel{flex:1;min-height:0;overflow:hidden}
+ .list-row{padding:13px 14px;gap:10px}
+ .source-icon{width:32px;height:32px;flex-basis:32px}
+ .delivery{padding:11px 14px}
+ .delivery-copy{font-size:11px;line-height:1.4;margin:5px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+ .delivery-actions{margin:7px 0 0 36px}
+ .delivery-actions .secondary{padding:5px 9px;font-size:11px}
+ .record-sub{font-size:11px}
+ .record-title{font-size:12px}
+ .footer{margin-top:12px;flex-shrink:0}
+ .settings{gap:9px;padding:14px;grid-template-columns:1fr 1fr}
+ .field{gap:4px}
+ .field input,.field select{height:36px;padding:7px 9px}
+ .form-bottom{margin-top:2px}
+ .paging{flex-shrink:0;display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px}
+ .paging button{padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--paper);font-size:11px}
+ .paging span{font-size:11px;color:var(--muted)}
+ body[data-view="overview"] #add-section{display:none}
+ body[data-view="sources"] #queue-section{display:none}
+ body[data-view="queue"] #sources-section,body[data-view="queue"] #add-section{display:none}
+ body[data-view="queue"] .workspace-panels{grid-template-columns:minmax(0,1fr)}
+ .workspace-panels>.section{min-width:0}
+}
+@media (max-width:900px){.workspace-panels{display:block}.paging{display:none}}
+@media (min-width:901px) and (max-height:700px){
+ .sidebar{padding-top:17px}
+ .content{padding-top:14px;padding-bottom:10px}
+ .top{margin-bottom:10px}
+ .heading{margin-bottom:9px}
+ #notice{margin-bottom:6px}
+ .stats{margin-bottom:9px}
+ .stat{min-height:65px;padding:10px 14px}
+ .stat-label{margin-bottom:6px}
+ .list-row{padding:9px 12px}
+ .delivery{padding:8px 12px}
+ .footer{margin-top:8px}
+}
 </style>
 </head>
 <body>
@@ -215,16 +271,17 @@ const page=`<!doctype html>
   <div class="side-bottom">AUTOMATED PUBLISHING<br>PERSONAL WORKSPACE</div>
 </aside>
 <main class="content" id="overview">
-  <div class="top"><div class="crumb">Workspace <span style="margin:0 8px">/</span> Overview</div><div class="top-actions"><span class="online"><span class="dot"></span> Worker online</span><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
-  <div class="heading"><div><h1>Overview</h1><p class="sub">発信するものを、ひとつの場所で。</p></div><button class="secondary" id="check-now">更新を確認</button></div>
+  <div class="top"><div class="crumb">Workspace <span style="margin:0 8px">/</span> <span id="crumb-current">Overview</span></div><div class="top-actions"><span class="online"><span class="dot"></span> Worker online</span><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
+  <div class="heading"><div><h1 id="page-title">Overview</h1><p class="sub">発信するものを、ひとつの場所で。</p></div><button class="secondary" id="check-now">更新を確認</button></div>
   <p id="notice" role="status" aria-live="polite"></p>
   <div class="stats">
     <div class="stat"><div class="stat-label">監視ソース</div><strong id="stat-sources">—</strong></div>
     <div class="stat"><div class="stat-label">承認待ち</div><strong id="stat-pending">—</strong></div>
     <div class="stat"><div class="stat-label">公開済み</div><strong id="stat-published">—</strong></div>
   </div>
-  <section class="section" id="sources-section"><div class="section-head"><h2>Sources</h2><span class="section-meta" id="source-count">0 sources</span></div><div class="panel" id="sources"><div class="empty">認証後に表示します。</div></div></section>
-  <section class="section" id="queue-section"><div class="section-head"><h2>Publishing queue</h2><span class="section-meta" id="queue-count">0 posts</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div></section>
+  <div class="workspace-panels">
+  <section class="section" id="sources-section"><div class="section-head"><h2>Sources</h2><span class="section-meta" id="source-count">0 sources</span></div><div class="panel" id="sources"><div class="empty">認証後に表示します。</div></div><div class="paging" id="sources-paging"></div></section>
+  <section class="section" id="queue-section"><div class="section-head"><h2>Publishing queue</h2><span class="section-meta" id="queue-count">0 posts</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div><div class="paging" id="queue-paging"></div></section>
   <section class="section" id="add-section"><div class="section-head"><h2>Add source</h2><span class="section-meta">GitHub / RSS</span></div>
     <div class="panel"><form class="settings" id="newSource">
       <div class="field"><label for="kind">種類</label><select id="kind"><option value="github">GitHub Releases</option><option value="rss">RSS / Atom</option></select></div>
@@ -234,6 +291,7 @@ const page=`<!doctype html>
       <div class="form-bottom"><div class="checks"><label><input id="x" type="checkbox" checked>X</label><label><input id="ig" type="checkbox">Instagram</label></div><button type="submit" class="primary" id="add">ソースを追加</button></div>
     </form></div>
   </section>
+  </div>
   <div class="footer"><span>Broadcast · Personal publishing dashboard</span><span>GitHub & RSS → X & Instagram</span></div>
 </main>
 </div>
@@ -248,6 +306,12 @@ const page=`<!doctype html>
 "use strict";
 const $=id=>document.getElementById(id);
 let token="";
+let allSources=[],allDeliveries=[],sourcePage=0,queuePage=0;
+const desktop=()=>window.matchMedia("(min-width:901px)").matches;
+const view=()=>document.body.dataset.view||"overview";
+function setView(v){if(!["overview","sources","queue"].includes(v))v="overview";document.body.dataset.view=v;const title=({overview:"Overview",sources:"Sources",queue:"Publishing queue"})[v];$("page-title").textContent=title;$("crumb-current").textContent=title;document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active",a.getAttribute("href")===(v==="overview"?"#overview":v==="sources"?"#sources-section":"#queue-section")));renderSources(allSources);renderQueue(allDeliveries);}
+function pageControls(id,total,page,size,onClick){const p=$(id);p.replaceChildren();if(!desktop()||total<=size)return;const count=Math.ceil(total/size);p.append(el("span",null,(page+1)+" / "+count));for(const [label,n] of [["前へ",page-1],["次へ",page+1]]){const b=el("button",null,label);b.type="button";b.disabled=n<0||n>=count;b.addEventListener("click",()=>onClick(n));p.append(b);}}
+
 const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=String(txt);return e;};
 function notice(msg,bad=false){$("notice").textContent=msg;$("notice").classList.toggle("error",bad);}
 async function api(path,init={}){
@@ -262,9 +326,11 @@ function shorten(s,max=75){s=String(s||"");return s.length>max?s.slice(0,max)+"�
 function renderSources(sources){
  $("stat-sources").textContent=sources.length;
  $("source-count").textContent=sources.length+" sources";
- const panel=$("sources");panel.replaceChildren();
+ allSources=sources;const panel=$("sources");panel.replaceChildren();
+ const size=desktop()?4:Infinity;if(sourcePage*size>=sources.length)sourcePage=0;
+ pageControls("sources-paging",sources.length,sourcePage,size,n=>{sourcePage=n;renderSources(allSources);});
  if(!sources.length){const empty=el("div","empty");empty.append(el("strong",null,"まだソースがありません"),el("span",null,"下のフォームからGitHubやRSSを追加できます。"));panel.append(empty);return;}
- for(const s of sources){
+ for(const s of sources.slice(sourcePage*size,sourcePage*size+size)){
    const row=el("div","list-row");const ico=el("div","source-icon",s.type==="github"?"⌘":"↗");
    const rec=el("div","record");rec.append(el("div","record-title",s.name));
    const sub=el("div","record-sub");const a=el("a",null,s.url);a.href=s.url;a.target="_blank";a.rel="noopener noreferrer";sub.append(a);rec.append(sub);
@@ -276,9 +342,11 @@ function renderQueue(items){
  $("queue-count").textContent=items.length+" posts";
  $("stat-pending").textContent=items.filter(x=>x.status==="pending_review").length;
  $("stat-published").textContent=items.filter(x=>x.status==="published").length;
- const panel=$("deliveries");panel.replaceChildren();
+ allDeliveries=items;const panel=$("deliveries");panel.replaceChildren();
+ const size=desktop()?(view()==="queue"?5:3):Infinity;if(queuePage*size>=items.length)queuePage=0;
+ pageControls("queue-paging",items.length,queuePage,size,n=>{queuePage=n;renderQueue(allDeliveries);});
  if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"まだ投稿はありません"),el("span",null,"更新が見つかるとここに表示されます。"));panel.append(empty);return;}
- for(const d of items){
+ for(const d of items.slice(queuePage*size,queuePage*size+size)){
   const item=el("div","delivery");const top=el("div","delivery-top");
   const platform=el("div","platform",d.platform==="x"?"𝕏":"◎");platform.title=d.platform;
   const rec=el("div","record");rec.append(el("div","record-title",d.title));
@@ -307,6 +375,9 @@ async function act(id,action,title){
  try{await api("/api/deliveries/"+encodeURIComponent(id)+"/"+action,{method:"POST"});await load();}
  catch(e){notice(String(e),true);}
 }
+document.body.dataset.view="overview";
+document.querySelectorAll(".nav a").forEach(a=>a.addEventListener("click",ev=>{if(desktop()){ev.preventDefault();const h=a.getAttribute("href");setView(h==="#sources-section"?"sources":h==="#queue-section"?"queue":"overview");}}));
+window.addEventListener("resize",()=>{renderSources(allSources);renderQueue(allDeliveries);});
 $("login-form").addEventListener("submit",async ev=>{
  ev.preventDefault();token=$("token").value.trim();if(!token)return;
  const btn=$("login-button");btn.disabled=true;btn.textContent="認証中…";$("login-message").textContent="";
