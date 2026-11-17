@@ -1,0 +1,19 @@
+name: Publish initial Broadcast release
+on:
+  push:
+    paths:
+      - .github/workflows/publish-initial-release.yml
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish v0.1.0 once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view v0.1.0 >/dev/null 2>&1; then
+            gh release create v0.1.0 --target main --title "Broadcast v0.1.0" --notes "Initial MVP: GitHub Releases and RSS ingestion, D1 delivery queue, and Cloudflare management dashboard. SNS publishing remains disabled pending credentials and approval."
+          fi
