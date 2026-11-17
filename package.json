@@ -1,0 +1,22 @@
+{
+  "name": "broadcast",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cf dev",
+    "build": "cf build",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "deploy": "cf deploy"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.2.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20261101.0",
+    "cf": "^0.30.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
