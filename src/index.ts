@@ -134,7 +134,7 @@ async function admin(req:Request,env:Env,url:URL){
   }
   return json({id,created:platforms.length,status:"pending_review"},201);
  }
- const match=url.pathname.match(/^\/api\/deliveries\/([\w-]+)\/(approve|skip)$/);
+ const match=url.pathname.match(/^\/api\/deliveries\/([\w-]+)\/(approve|delete)$/);
  if(req.method==="POST"&&match){
   const [ ,id,action]=match;
   if(!safeId(id))return error("Invalid ID");
@@ -148,7 +148,11 @@ async function admin(req:Request,env:Env,url:URL){
    try{const parsed=JSON.parse(delivery.image_urls||"null");if(Array.isArray(parsed))imageCount=parsed.length;}catch{}
    if(delivery.platform==="instagram"&&imageCount>1)return error("Instagramへの複数画像の投稿は準備中です。保存とプレビューは利用できます",409);
   }
-  const result=await env.DB.prepare(action==="approve"?"UPDATE deliveries SET status='scheduled',scheduled_at=datetime('now') WHERE id=? AND status='pending_review'":"UPDATE deliveries SET status='skipped' WHERE id=? AND status IN ('pending_review','scheduled')").bind(id).run();
+  if(action==="delete"){
+   const result=await env.DB.prepare("DELETE FROM deliveries WHERE id=? AND status='pending_review'").bind(id).run();
+   return json({updated:result.meta.changes});
+  }
+  const result=await env.DB.prepare("UPDATE deliveries SET status='scheduled',scheduled_at=datetime('now') WHERE id=? AND status='pending_review'").bind(id).run();
   return json({updated:result.meta.changes});
  }
  return error("Not found",404);
@@ -287,7 +291,7 @@ textarea:focus,.text-input:focus{border-color:#555}
  <div class="header-inner">
   <a class="brand" id="brand-link" href="#compose">Broadcast</a>
   <nav class="nav" aria-label="画面切り替え">
-   <a href="#compose" class="active">投稿を作る</a>
+   <a href="#compose" class="active">投稿を作成</a>
    <a href="#queue-section">投稿一覧</a>
   </nav>
   <div class="header-actions"><button class="secondary" id="logout" style="display:none">ログアウト</button></div>
@@ -299,7 +303,7 @@ textarea:focus,.text-input:focus{border-color:#555}
   <form id="newPost" class="form-area">
    <div class="field">
     <label for="post-text">文章</label>
-    <textarea id="post-text" rows="7" maxlength="2200" required placeholder="ここに投稿内容を入力"></textarea>
+    <textarea id="post-text" rows="7" maxlength="2200" required placeholder="投稿内容を入力"></textarea>
     <div class="field-meta"><span class="hint" id="text-count">0文字</span></div>
    </div>
    <div class="field">
@@ -310,12 +314,11 @@ textarea:focus,.text-input:focus{border-color:#555}
     <label for="post-file">画像を追加（最大4枚）</label>
     <label class="file-choose" for="post-file">画像を選ぶ <span>または、ここにドラッグして追加</span></label>
     <input id="post-file" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="upload-help">
-    <div class="hint" id="upload-help">JPEG・PNG・WebP ／ 1枚8MBまで。選択後に写真を確認できます。</div>
+    <div class="hint" id="upload-help"></div>
     <div id="image-preview" class="image-preview" aria-live="polite"></div>
    </div>
    <div class="form-actions">
     <button class="primary" id="save-post" type="submit">保存する</button>
-    <span class="hint">保存してもSNSには投稿されません。</span>
    </div>
   </form>
  </section>
@@ -446,11 +449,11 @@ function renderQueue(items){
    target.append(el("span","platform",delivery.platform==="x"?"X":"Instagram"));
    target.append(el("span","pill "+statusClass(delivery.status),statusName(delivery.status)));
    if(delivery.status==="pending_review"){
-    const approve=el("button","secondary","承認"),skip=el("button","secondary","見送る");
-    approve.type="button";skip.type="button";
+    const approve=el("button","secondary","承認"),remove=el("button","secondary","削除");
+    approve.type="button";remove.type="button";
     approve.addEventListener("click",()=>act(delivery,"approve"));
-    skip.addEventListener("click",()=>act(delivery,"skip"));
-    target.append(approve,skip);
+    remove.addEventListener("click",()=>act(delivery,"delete"));
+    target.append(approve,remove);
    }
    row.append(target);
    if(delivery.last_error)row.append(el("p","delivery-copy error-note",delivery.last_error));
@@ -475,7 +478,7 @@ async function act(item,action){
   notice((item.platform==="x"?"X":"Instagram")+"の連携が未設定です。先にアカウントを接続してください。",true);
   return;
  }
- if(!confirm(action==="approve"?"この投稿を承認しますか？ 次の配信処理でSNSに送信されます。":"この投稿を見送りますか？"))return;
+ if(!confirm(action==="approve"?"この投稿を承認しますか？ 次の配信処理でSNSに送信されます。":"この投稿を削除しますか？ 元に戻せません。"))return;
  try{
   const result=await api("/api/deliveries/"+encodeURIComponent(item.id)+"/"+action,{method:"POST"});
   if(result.updated!==1)throw Error("すでに処理された可能性があります");
@@ -502,7 +505,7 @@ function renderSelectedImages(){
   });
   wrapper.append(remove);box.append(wrapper);
  });
- $("upload-help").textContent=mediaEnabled?"画像 "+selectedFiles.length+" / 4枚・1枚8MB以内（JPEG・PNG・WebP）":"画像保存のGitHub設定が必要です";
+ $("upload-help").textContent=mediaEnabled?(selectedFiles.length?"画像 "+selectedFiles.length+" / 4枚":""):"画像保存のGitHub設定が必要です";
 }
 function addImages(files){
  if(!mediaEnabled){notice("画像保存のGitHub設定が必要です",true);return;}
