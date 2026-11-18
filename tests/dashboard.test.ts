@@ -16,7 +16,10 @@ describe("dashboard", () => {
   expect(source).not.toContain('id="stat-pending"');
   expect(source).not.toContain('id="stat-scheduled"');
   expect(source).not.toContain('id="stat-published"');
-  expect(source).toContain('<details class="image-details"');
+  expect(source).toContain('id="post-file"');
+  expect(source).toContain('id="image-preview"');
+  expect(source).toContain('url.pathname==="/api/media"');
+  expect(source).toContain('media_enabled:!!env.MEDIA');
   expect(source).not.toContain("GitHub・RSSの更新と投稿を管理");
   expect(source).not.toContain("Worker online");
   expect(source).toContain('href="/favicon.svg"');
