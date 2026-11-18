@@ -249,10 +249,36 @@ textarea:focus,.text-input:focus{border-color:#555}
  .delivery-copy,.delivery-actions{margin-left:0}
 }
 
-.image-upload-field input[type=file]{display:block;width:100%;max-width:420px;padding:10px 12px;border:1px solid var(--line);border-radius:5px;background:#fff}
-.image-preview{margin-top:10px;display:flex;gap:12px;align-items:flex-start}
-.image-preview[hidden]{display:none}
-.image-preview img{display:block;max-width:210px;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:5px}
+.image-upload-field input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.file-choose{display:flex!important;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;border:1px dashed #999;border-radius:7px;background:#fafafa;padding:18px 20px;font-size:16px!important;font-weight:650!important}
+.file-choose span{font-size:13px;font-weight:400;color:#666}
+.file-choose:hover,.file-choose:focus-within{border-color:#444;background:#f4f4f4}
+.image-upload-field:focus-within .file-choose{outline:2px solid #444;outline-offset:2px}
+.image-preview{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:10px;margin-top:10px;max-width:650px}
+.image-preview:empty{display:none}
+.upload-thumb{border:1px solid var(--line);border-radius:6px;padding:6px;min-width:0}
+.upload-thumb img{display:block;width:100%;height:120px;object-fit:cover;border-radius:4px}
+.upload-thumb .secondary{padding:5px 8px;margin-top:7px;font-size:13px;width:100%}
+.upload-thumb .hint{display:block;margin-top:4px}
+.delivery-list{border-top:0}
+.delivery{padding:18px 20px;margin-bottom:12px;border:1px solid var(--line);border-radius:8px}
+.record-title{font-size:17px;line-height:1.65;font-weight:500;white-space:pre-wrap}
+.delivery-copy{font-size:15px;line-height:1.65;margin-left:0}
+.delivery-top{gap:12px;align-items:center;flex-wrap:wrap}
+.delivery-actions{margin:12px 0 0;align-items:center}
+.delivery-actions .secondary{padding:8px 12px}
+.delivery-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:9px;max-width:670px;margin:12px 0 2px}
+.gallery-image{display:block;width:100%;padding:0;border:1px solid #ddd;background:#f8f8f8;border-radius:6px;overflow:hidden}
+.gallery-image img{width:100%;height:130px;object-fit:cover;display:block}
+.gallery-image:hover{border-color:#444}
+.delivery-target{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:10px}
+.delivery-target .platform{font-size:13px}
+.image-dialog{border:0;border-radius:8px;max-width:96vw;max-height:96vh;padding:14px;background:#fff;box-shadow:0 8px 28px #0004}
+.image-dialog::backdrop{background:#000c}
+.image-dialog img{display:block;max-width:min(90vw,1100px);max-height:76vh;object-fit:contain}
+.image-dialog-controls{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:10px}
+.image-dialog-controls .secondary{font-size:14px}
+@media(max-width:650px){.delivery{padding:14px 12px}.record-title{font-size:16px}.delivery-gallery{grid-template-columns:repeat(auto-fill,minmax(90px,1fr))}.gallery-image img{height:105px}.file-choose span{width:100%}}
 </style>
 </head>
 <body data-view="compose">
@@ -281,14 +307,11 @@ textarea:focus,.text-input:focus{border-color:#555}
     <div class="checks"><label><input id="post-x" type="checkbox" checked>X</label><label><input id="post-ig" type="checkbox">Instagram</label></div>
    </div>
    <div class="field image-upload-field">
-    <label for="post-file">画像（任意）</label>
-    <input id="post-file" type="file" accept="image/jpeg,image/png,image/webp">
-    <div class="hint" id="upload-help">JPEG・PNG・WebP / 8MB以内</div>
-    <div id="image-preview" class="image-preview" hidden>
-      <img id="preview-image" alt="選択した画像のプレビュー">
-      <button class="secondary" id="clear-image" type="button">画像を外す</button>
-    </div>
-    <input id="post-image" type="hidden">
+    <label for="post-file">画像を追加（最大4枚）</label>
+    <label class="file-choose" for="post-file">画像を選ぶ <span>または、ここにドラッグして追加</span></label>
+    <input id="post-file" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="upload-help">
+    <div class="hint" id="upload-help">JPEG・PNG・WebP ／ 1枚8MBまで。選択後に写真を確認できます。</div>
+    <div id="image-preview" class="image-preview" aria-live="polite"></div>
    </div>
    <div class="form-actions">
     <button class="primary" id="save-post" type="submit">保存する</button>
@@ -306,6 +329,11 @@ textarea:focus,.text-input:focus{border-color:#555}
  </section>
 </main>
 </div>
+<dialog id="image-dialog" class="image-dialog" aria-label="画像を拡大">
+ <div class="image-dialog-controls"><span id="image-position"></span><button class="secondary" id="image-close" type="button">閉じる</button></div>
+ <img id="image-large" alt="投稿画像">
+ <div class="image-dialog-controls"><button class="secondary" id="image-prev" type="button">前の画像</button><button class="secondary" id="image-next" type="button">次の画像</button></div>
+</dialog>
 <div class="lock" id="lock">
  <div class="login">
   <div class="brand">Broadcast</div>
