@@ -154,7 +154,7 @@ textarea:focus,.text-input:focus{border-color:#555}
 #notice{margin:0;min-height:0;color:#555;font-size:13px}
 #notice:not(:empty){margin-bottom:12px}
 #notice.error{color:var(--danger)}
-.list-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.list-head{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
 .list-head .view-title{margin:0}
 .list-meta{color:var(--muted);font-size:12px}
 .list-actions{margin-left:auto}
@@ -213,7 +213,6 @@ textarea:focus,.text-input:focus{border-color:#555}
 <main class="main">
  <p id="notice" role="status" aria-live="polite"></p>
  <section class="view" id="compose">
-  <h1 class="view-title">新しい投稿</h1>
   <form id="newPost" class="form-area">
    <div class="field">
     <label for="post-text">文章</label>
@@ -236,7 +235,6 @@ textarea:focus,.text-input:focus{border-color:#555}
  </section>
  <section class="view" id="queue-section">
   <div class="list-head">
-   <h1 class="view-title">投稿一覧</h1>
    <span class="list-meta" id="queue-count">0件</span>
    <div class="list-actions"><button class="secondary" id="refresh" type="button">更新</button></div>
   </div>
