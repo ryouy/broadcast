@@ -10,8 +10,13 @@ describe("dashboard", () => {
   expect(source).not.toContain("発信するものを、ひとつの場所で。");
   expect(source).not.toContain("PERSONAL WORKSPACE");
   expect(source).toContain("投稿一覧");
-  expect(source).toContain("投稿を作成");
-  expect(source).toContain("ホーム");
+  expect(source).toContain("投稿を作る");
+  expect(source).not.toContain('>ホーム</a>');
+  expect(source).not.toContain('id="new-post"');
+  expect(source).not.toContain('id="stat-pending"');
+  expect(source).not.toContain('id="stat-scheduled"');
+  expect(source).not.toContain('id="stat-published"');
+  expect(source).toContain('<details class="image-details"');
   expect(source).not.toContain("GitHub・RSSの更新と投稿を管理");
   expect(source).not.toContain("Worker online");
   expect(source).toContain('href="/favicon.svg"');
@@ -19,7 +24,7 @@ describe("dashboard", () => {
   expect(source).toContain('id="newPost"');
   expect(source).toContain('id="post-text"');
   expect(source).toContain("window.addEventListener(\"hashchange\",navigate)");
-  expect(source.indexOf("<header class=\"sidebar\">")).toBeLessThan(source.indexOf("<main class=\"content\""));
+  expect(source.indexOf("<header class=\"site-header\">")).toBeLessThan(source.indexOf("<main class=\"main\""));
   expect(source).not.toContain('id="login-form"');
   expect(source).not.toContain('ADMIN_TOKEN');
   expect(source).not.toContain('if(!token)return');
@@ -31,13 +36,13 @@ describe("dashboard", () => {
   expect(source).toContain('url.pathname==="/auth/google"');
   expect(source).toContain('url.pathname==="/auth/callback"');
   expect(source).toContain('url.pathname==="/api/posts"');
-  expect(source).toContain('class="workspace-panels"');
+  expect(source).not.toContain('class="workspace-panels"');
   expect(source).not.toContain('url.pathname==="/api/check"');
   expect(source).not.toContain('url.pathname==="/webhooks/github"');
   expect(source).not.toContain('id="newSource"');
   expect(source).toContain('id="queue-paging"');
-  expect(source).toContain('height:100dvh');
-  expect(source).toContain('overflow:hidden');
+  expect(source).toContain('class="delivery-list"');
+  expect(source).toContain('class="form-area"');
  });
  it("client-side JavaScript parses without syntax errors", () => {
   expect(script).toBeTruthy();
