@@ -338,7 +338,6 @@ textarea:focus,.text-input:focus{border-color:#555}
  #compose .file-choose{height:76px;max-width:330px;flex-direction:column;gap:2px}
  #compose .file-choose-note{width:auto}
 }
-.post-edit-button{margin-top:12px}
 #cancel-edit[hidden]{display:none}
 </style>
 </head>
@@ -517,16 +516,16 @@ function renderQueue(items){
    });
    row.append(gallery);
   }
-  if(item.is_manual&&entries.every(d=>d.status==="pending_review")){
-   const editButton=el("button","secondary post-edit-button","編集");
-   editButton.type="button";
-   editButton.addEventListener("click",()=>startEditing(entries));
-   row.append(editButton);
-  }
   for(const delivery of entries){
    const target=el("div","delivery-target");
    target.append(el("span","platform",delivery.platform==="x"?"X":"Instagram"));
    target.append(el("span","pill "+statusClass(delivery.status),statusName(delivery.status)));
+   if(delivery===entries[0]&&item.is_manual&&entries.every(d=>d.status==="pending_review")){
+    const editButton=el("button","secondary","編集");
+    editButton.type="button";
+    editButton.addEventListener("click",()=>startEditing(entries));
+    target.append(editButton);
+   }
    if(delivery.status==="pending_review"){
     const approve=el("button","secondary","承認"),remove=el("button","secondary","削除");
     approve.type="button";remove.type="button";
