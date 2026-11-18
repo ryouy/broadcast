@@ -10,7 +10,10 @@ describe("dashboard", () => {
   expect(source).not.toContain("発信するものを、ひとつの場所で。");
   expect(source).not.toContain("PERSONAL WORKSPACE");
   expect(source).toContain("Publishing queue");
-  expect(source).toContain('id="login-form"');
+  expect(source).not.toContain('id="login-form"');
+  expect(source).not.toContain('ADMIN_TOKEN');
+  expect(source).not.toContain('if(!token)return');
+  expect(source).toContain('if(!isAuthenticated)return');
   const configRoute=source.indexOf('url.pathname==="/api/auth/config"');
   const adminRoute=source.lastIndexOf('url.pathname.startsWith("/api/")');
   expect(configRoute).toBeGreaterThan(0);
