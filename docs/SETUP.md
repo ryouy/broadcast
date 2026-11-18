@@ -13,9 +13,9 @@
 - Worker: `broadcast`
 - URL: https://broadcast.ryouy.workers.dev/
 - D1: `broadcast-db`（初期SQL適用済み）
-- Cron: `*/15 * * * *`（UTC、15分ごと）
+- Cron: `*/15 * * * *`（UTC、15分ごと）。監視検証時のみ一時的に毎分実行へ変更し、確認後に元へ復旧済み。
 - GitHub Releases APIの定期監視と、Google OAuth移行用の認証コードを実装済み。現在はGoogleログイン専用です。認証情報が欠けている場合、管理APIは503を返します。
-- `ryouy/broadcast` は監視ソースとして登録済み。GitHub Release v0.1.0を作成し、初回管理画面表示のためにD1へ一件だけ手動登録済み（自動検知成功の証拠ではありません）。
+- `ryouy/broadcast` は監視ソースとして登録済み。v0.1.0は初回画面確認用に手動登録。v0.1.1（GitHub Release ID 449547826）は2026-11-18 05:06:15 UTCに公開、同日05:17:05 UTCにCronによるポーリングでD1へ自動検知・登録されたことを確認済み。X用投稿キューは `pending_review` のまま。
 - Google OAuthクライアントの設定、許可メールリストの登録、Googleアカウントでのログイン確認は完了。旧`ADMIN_TOKEN`は廃止。
 - SNS認証情報は未設定です。検証中は承認ボタンを押さないでください。
 - **注意:** GitHub Actionsはビルド・疎通のCIのみで、自動デプロイはまだ構成していません。GitHubへの追加コミットが自動で公開URLへ反映されるわけではありません。
@@ -70,6 +70,10 @@ Webhookは `/webhooks/github` に従来どおり署名を要求し、Googleロ�
 - Events: `Releases` のみ
 
 管理画面で同じ `https://github.com/owner/repo` をソース登録します。Webhookを設定できない場合もReleases APIを15分ごとにポーリングします。`ryouy/broadcast` は登録済みです。
+
+### 監視状況の診断
+
+`migrations/0002_monitoring.sql` を適用済み。ソースごとに `last_checked_at` / `last_check_error`、Cron全体には `monitoring_state.last_cron_at` / `last_cron_error` を記録します。監視に失敗したソースは管理画面のSourcesにもエラー内容が表示されます。診断機能は検証後に追加したため、最初の成功時刻（05:17 UTC）は `events.detected_at` で確認しています。
 
 ### RSS
 管理画面にRSS/AtomのHTTPS URLを追加。最初の取得は基準点の登録だけで過去記事を一括投稿しません。以後の新着をキューへ登録します。
