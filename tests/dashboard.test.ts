@@ -19,7 +19,7 @@ describe("dashboard", () => {
   expect(source).toContain('id="post-file"');
   expect(source).toContain('id="image-preview"');
   expect(source).toContain('url.pathname==="/api/media"');
-  expect(source).toContain('media_enabled:!!env.MEDIA');
+  expect(source).toContain('media_enabled:!!env.GITHUB_MEDIA_TOKEN');
   expect(source).not.toContain("GitHub・RSSの更新と投稿を管理");
   expect(source).not.toContain("Worker online");
   expect(source).toContain('href="/favicon.svg"');
