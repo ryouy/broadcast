@@ -23,6 +23,17 @@ describe("direct publishing endpoint security", () => {
   expect(writes.filter(x=>x.sql.startsWith("INSERT INTO deliveries"))).toHaveLength(1);
   expect(writes.find(x=>x.sql.startsWith("INSERT INTO deliveries"))?.params[3]).toBe("新しいお知らせです");
  });
+ it("deletes only pending deliveries instead of marking them skipped",async()=>{
+  const secret="test-session-secret-with-adequate-length";
+  const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
+  const statements:Array<{sql:string;params:unknown[]}>=[],db={prepare(sql:string){return {bind(...params:unknown[]){return {run:async()=>{statements.push({sql,params});return {meta:{changes:1}};}};}};}};
+  const env={DB:db,GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
+  const req=new Request(base+"/api/deliveries/example-id/delete",{method:"POST",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token}});
+  const res=await worker.fetch(req,env);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({updated:1});
+  expect(statements).toEqual([{sql:"DELETE FROM deliveries WHERE id=? AND status='pending_review'",params:["example-id"]}]);
+ });
  it("saves ordered multiple images in the post record",async()=>{
   const secret="test-session-secret-with-adequate-length";
   const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
