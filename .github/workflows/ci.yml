@@ -20,10 +20,8 @@ jobs:
           echo "homepage_status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://broadcast.ryouy.workers.dev/)"
           echo "api_status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://broadcast.ryouy.workers.dev/api/status)"
           echo "auth_config=$(curl --silent --show-error --max-time 12 https://broadcast.ryouy.workers.dev/api/auth/config)"
-      - name: Package OAuth routing fix
+      - name: Verify public Google auth configuration
         run: |
-          npx esbuild src/index.ts --bundle --platform=browser --format=esm --target=es2022 --outfile=worker-bundle.js
-          echo BROADCAST_BUNDLE_START
-          base64 -w0 worker-bundle.js
-          echo
-          echo BROADCAST_BUNDLE_END
+          config=$(curl --fail --silent --show-error --max-time 15 https://broadcast.ryouy.workers.dev/api/auth/config)
+          echo "$config"
+          test "$config" = '{"mode":"google"}'
