@@ -18,6 +18,7 @@ describe("dashboard", () => {
   expect(source).not.toContain('id="stat-published"');
   expect(source).toContain('id="post-file"');
   expect(source).toContain('id="image-preview"');
+  expect(source).toContain("img-src 'self' blob: https://raw.githubusercontent.com https://*.githubusercontent.com");
   expect(source).toContain('id="image-dialog"');
   expect(source).toContain('multiple aria-describedby="upload-help"');
   expect(source).toContain('function showImage(urls,index)');
