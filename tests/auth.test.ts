@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { authMode, permittedEmail, sameOrigin, login, session, logout, BASE_URL } from "../src/auth";
 
 describe("Google OAuth authentication", () => {
- it("keeps legacy token login only until OAuth setup begins", () => {
-  expect(authMode({ADMIN_TOKEN:"existing"})).toBe("token");
+ it("requires configured Google OAuth credentials", () => {
+  expect(authMode({})).toBe("unconfigured");
   expect(authMode({GOOGLE_CLIENT_ID:"test"})).toBe("unconfigured");
   expect(authMode({GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:"long-key",ALLOWED_EMAILS:"alice@gmail.com"})).toBe("google");
  });
