@@ -10,7 +10,6 @@ type Delivery={id:string;event_id:string;platform:"x"|"instagram";text:string;im
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const error=(message:string,status=400)=>json({error:message},status);
 const uid=()=>crypto.randomUUID();
-const text=(input:unknown,max=500)=>normalizeText(String(input??""),max);
 const httpUrl=(value:string)=>{try{const u=new URL(value);return u.protocol==="https:"&&!u.username&&!u.password&&!["localhost","127.0.0.1","::1"].includes(u.hostname)&&!u.hostname.endsWith(".local")&& !u.hostname.endsWith(".internal");}catch{return false;}};
 const safeId=(s:string)=>/^[a-zA-Z0-9_-]{1,70}$/.test(s);
 const ACCESS_HEADERS={"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"};
