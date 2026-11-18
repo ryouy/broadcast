@@ -78,7 +78,7 @@ async function poll(env:Env){
  }
 }
 // Public GitHub Releases API fallback: works without repository webhook admin rights.
-async function pollGitHub(env:Env,source:Source) {
+export async function pollGitHub(env:Env,source:Source) {
  const repo=githubRepo(source.url);if(!repo)return;
  const resp=await fetch("https://api.github.com/repos/"+repo+"/releases?per_page=10",{
   headers:{"accept":"application/vnd.github+json","user-agent":"broadcast-release-monitor"},
