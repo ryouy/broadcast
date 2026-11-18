@@ -218,6 +218,11 @@ textarea:focus,.text-input:focus{border-color:#555}
  .delivery{padding:12px 0}
  .delivery-copy,.delivery-actions{margin-left:0}
 }
+
+.image-upload-field input[type=file]{display:block;width:100%;max-width:420px;padding:10px 12px;border:1px solid var(--line);border-radius:5px;background:#fff}
+.image-preview{margin-top:10px;display:flex;gap:12px;align-items:flex-start}
+.image-preview[hidden]{display:none}
+.image-preview img{display:block;max-width:210px;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:5px}
 </style>
 </head>
 <body data-view="compose">
@@ -245,10 +250,16 @@ textarea:focus,.text-input:focus{border-color:#555}
     <span class="field-label">投稿先</span>
     <div class="checks"><label><input id="post-x" type="checkbox" checked>X</label><label><input id="post-ig" type="checkbox">Instagram</label></div>
    </div>
-   <details class="image-details" id="image-details">
-    <summary>画像を付ける（URL指定）</summary>
-    <div class="field"><label for="post-image">画像URL</label><input id="post-image" class="text-input" type="url" placeholder="https://example.com/image.jpg"><span class="hint">Instagramへの投稿には画像が必要です。</span></div>
-   </details>
+   <div class="field image-upload-field">
+    <label for="post-file">画像（任意）</label>
+    <input id="post-file" type="file" accept="image/jpeg,image/png,image/webp">
+    <div class="hint" id="upload-help">JPEG・PNG・WebP / 8MB以内</div>
+    <div id="image-preview" class="image-preview" hidden>
+      <img id="preview-image" alt="選択した画像のプレビュー">
+      <button class="secondary" id="clear-image" type="button">画像を外す</button>
+    </div>
+    <input id="post-image" type="hidden">
+   </div>
    <div class="form-actions">
     <button class="primary" id="save-post" type="submit">保存する</button>
     <span class="hint">保存してもSNSには投稿されません。</span>
@@ -350,6 +361,9 @@ async function load(){
  try{
   const [items,status]=await Promise.all([api("/api/deliveries"),api("/api/status")]);
   connections=status.connections||{x:false,instagram:false};
+  mediaEnabled=status.media_enabled===true;
+  $("post-file").disabled=!mediaEnabled;
+  $("upload-help").textContent=mediaEnabled?"JPEG・PNG・WebP / 8MB以内":"画像の保存先を準備中です（Cloudflare R2が未設定）";
   renderQueue(items);
   notice("");
  }catch(e){notice("読み込みに失敗しました: "+String(e),true);}
@@ -366,6 +380,40 @@ async function act(item,action){
   await load();
  }catch(e){notice(String(e),true);}
 }
+let mediaEnabled=false,selectedObjectUrl=null;
+function clearImage(){
+ $("post-file").value="";
+ $("post-image").value="";
+ $("image-preview").hidden=true;
+ $("preview-image").removeAttribute("src");
+ if(selectedObjectUrl){URL.revokeObjectURL(selectedObjectUrl);selectedObjectUrl=null;}
+}
+$("clear-image").addEventListener("click",clearImage);
+$("post-file").addEventListener("change",()=>{
+ clearImagePreviewOnly();
+ const file=$("post-file").files?.[0];
+ if(!file)return;
+ if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>8_000_000||file.size===0){
+  notice("JPEG・PNG・WebPの画像を8MB以内で選んでください。",true);
+  $("post-file").value="";return;
+ }
+ selectedObjectUrl=URL.createObjectURL(file);
+ $("preview-image").src=selectedObjectUrl;
+ $("image-preview").hidden=false;
+});
+function clearImagePreviewOnly(){
+ if(selectedObjectUrl){URL.revokeObjectURL(selectedObjectUrl);selectedObjectUrl=null;}
+ $("image-preview").hidden=true;
+ $("post-image").value="";
+}
+async function uploadSelectedImage(){
+ const file=$("post-file").files?.[0];
+ if(!file)return "";
+ if(!mediaEnabled)throw Error("画像アップロードを利用するにはCloudflare R2の有効化が必要です");
+ const response=await api("/api/media",{method:"POST",headers:{"content-type":file.type},body:file});
+ if(typeof response.url!=="string")throw Error("画像アップロードに失敗しました");
+ return response.url;
+}
 function countChars(){
  const count=$("post-text").value.length;
  $("text-count").textContent=count+"文字"+($("post-x").checked?" / Xは280文字まで":"");
@@ -375,16 +423,18 @@ $("post-text").addEventListener("input",countChars);
 $("post-x").addEventListener("change",countChars);
 $("newPost").addEventListener("submit",async e=>{
  e.preventDefault();if(!isAuthenticated)return;
- const message=$("post-text").value.trim(),image=$("post-image").value.trim();
+ const message=$("post-text").value.trim();
  const x=$("post-x").checked,instagram=$("post-ig").checked;
  if(!message)return notice("文章を入力してください。",true);
  if(!x&&!instagram)return notice("投稿先を選んでください。",true);
  if(x&&message.length>280)return notice("Xへの投稿は280文字以内にしてください。",true);
- if(instagram&&!image)return notice("Instagramには画像のURLが必要です。",true);
+ if(instagram&&!$("post-file").files?.length)return notice("Instagramには画像が必要です。",true);
  const button=$("save-post");button.disabled=true;
  try{
+  if($("post-file").files?.length)notice("画像をアップロードしています…");
+  const image=await uploadSelectedImage();
   await api("/api/posts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:message,image_url:image,x,instagram})});
-  $("newPost").reset();$("image-details").open=false;countChars();await load();goTo("#queue-section");
+  $("newPost").reset();clearImage();countChars();await load();goTo("#queue-section");
   notice("確認待ちに保存しました。内容を確認してから承認できます。");
  }catch(err){notice("保存できませんでした: "+String(err),true);}
  finally{button.disabled=false;}
