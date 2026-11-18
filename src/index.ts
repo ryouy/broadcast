@@ -465,7 +465,7 @@ export default {
   try{
    if(req.method==="GET"&&url.pathname.startsWith("/media/")){
     const key=url.pathname.slice("/media/".length);
-    if(!/^[a-f0-9-]{36}\\.(jpg|png|webp)$/.test(key))return error("Not found",404);
+    if(!/^[a-f0-9-]{36}\.(jpg|png|webp)$/.test(key))return error("Not found",404);
     if(!env.MEDIA)return error("Not found",404);
     const object=await env.MEDIA.get(key);
     if(!object)return error("Not found",404);
