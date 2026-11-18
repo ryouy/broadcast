@@ -59,23 +59,32 @@ async function admin(req:Request,env:Env,url:URL){
  if(req.method!=="GET"&&!sameOrigin(req))return error("Invalid request origin",403);
  if(req.method==="GET"&&url.pathname==="/api/status"){
   const counts=await env.DB.prepare("SELECT status,COUNT(*) AS count FROM deliveries GROUP BY status").all();
-  const monitoring=await env.DB.prepare("SELECT last_cron_at,last_cron_error FROM monitoring_state WHERE id=1").first();
-  return json({ok:true,counts:counts.results,monitoring});
+  return json({ok:true,counts:counts.results,connections:{x:!!env.X_USER_ACCESS_TOKEN,instagram:!!(env.INSTAGRAM_ACCESS_TOKEN&&env.INSTAGRAM_USER_ID)}});
  }
- if(req.method==="GET"&&url.pathname==="/api/sources")return json((await env.DB.prepare("SELECT * FROM sources ORDER BY created_at DESC").all()).results);
- if(req.method==="GET"&&url.pathname==="/api/deliveries")return json((await env.DB.prepare("SELECT d.*,e.title,e.url AS source_url,s.name AS source_name FROM deliveries d JOIN events e ON e.id=d.event_id JOIN sources s ON s.id=e.source_id ORDER BY d.created_at DESC LIMIT 100").all()).results);
- if(req.method==="POST"&&url.pathname==="/api/sources"){
-  const body:any=await req.json().catch(()=>null);if(!body)return error("Invalid JSON");
-  const type=body.type;
-  const name=text(body.name,100),address=String(body.url||"").replace(/\/$/,"");
-  if(!["github","rss"].includes(type)||!name||!httpUrl(address))return error("Invalid source");
-  if(type==="github"&&!githubRepo(address))return error("GitHub URL must be https://github.com/owner/repo");
-  if(type==="rss"&&new URL(address).hostname==="github.com")return error("Invalid RSS hostname");
-  const id=uid();
-  const image=body.default_image_url?String(body.default_image_url):null;
-  if(image&&!httpUrl(image))return error("Invalid image URL");
-  await env.DB.prepare("INSERT INTO sources(id,type,name,url,post_x,post_instagram,default_image_url) VALUES(?,?,?,?,?,?,?)").bind(id,type,name,address,body.post_x===false?0:1,body.post_instagram===true?1:0,image).run();
-  return json({id},201);
+ if(req.method==="GET"&&url.pathname==="/api/deliveries"){
+  const rows=await env.DB.prepare("SELECT d.*,e.title,e.url AS source_url,s.name AS source_name,CASE WHEN s.id='manual-broadcast' THEN 1 ELSE 0 END AS is_manual FROM deliveries d JOIN events e ON e.id=d.event_id JOIN sources s ON s.id=e.source_id ORDER BY d.created_at DESC LIMIT 100").all();
+  return json(rows.results);
+ }
+ if(req.method==="POST"&&url.pathname==="/api/posts"){
+  const body:any=await req.json().catch(()=>null);
+  if(!body||typeof body.text!=="string")return error("本文を入力してください");
+  const message=body.text.trim();
+  if(!message||message.length>2200)return error("本文は1〜2200文字で入力してください");
+  const platforms=["x","instagram"].filter(p=>body[p]===true);
+  if(!platforms.length)return error("投稿先を選択してください");
+  if(platforms.includes("x")&&message.length>280)return error("Xへの投稿は280文字以内にしてください");
+  const image=typeof body.image_url==="string"?body.image_url.trim():"";
+  if(image&&!httpUrl(image))return error("画像には公開HTTPS URLを指定してください");
+  if(platforms.includes("instagram")&&!image)return error("Instagramには画像URLが必要です");
+  const id=uid(),eid=uid();
+  await env.DB.prepare("INSERT OR IGNORE INTO sources(id,type,name,url,enabled,post_x,post_instagram) VALUES('manual-broadcast','github','Broadcast','https://broadcast.ryouy.workers.dev/',0,0,0)").run();
+  await env.DB.prepare("INSERT INTO events(id,source_id,external_id,title,description,url,image_url) VALUES(?,'manual-broadcast',?,?,?,?,?)")
+   .bind(eid,id,message.slice(0,70),message,"https://broadcast.ryouy.workers.dev/",image||null).run();
+  for(const platform of platforms){
+   await env.DB.prepare("INSERT INTO deliveries(id,event_id,platform,text,image_url) VALUES(?,?,?,?,?)")
+    .bind(uid(),eid,platform,message,image||null).run();
+  }
+  return json({id,created:platforms.length,status:"pending_review"},201);
  }
  const match=url.pathname.match(/^\/api\/deliveries\/([\w-]+)\/(approve|skip)$/);
  if(req.method==="POST"&&match){
