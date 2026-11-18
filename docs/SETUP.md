@@ -57,15 +57,18 @@ cf deploy
 GitHub Actionsはテスト・疎通確認用です。GitHubへのコミットは自動的にCloudflareへデプロイされません。
 
 
-## 画像ファイルの直接アップロード
+## 画像保存（GitHub）
 
-R2有効化後に以下を設定します。
+R2は使用しません。公開リポジトリ `ryouy/broadcast` に画像専用ブランチ `broadcast-images` を作成済みです。画像は `media/<UUID>.<拡張子>` で保存され、GitHub raw URLを使用します。
 
-1. Cloudflareの **R2 Object Storage** を有効化（現時点ではAPIがエラー10042「R2を有効化してください」を返しています）。
-2. バケット **`broadcast-media`** を作成。
-3. Workers & Pages → `broadcast` → Settings → Bindingsで、R2 bucketバインディング **`MEDIA`** を `broadcast-media` に接続。
-4. Workerを再デプロイして、管理画面の画像選択が有効になることを確認。
+### 必要な設定（未完了）
+1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token。
+2. リポジトリ **`ryouy/broadcast` のみ**を選択し、Repository permissionsの **Contents: Read and write** を設定。期限も必要に応じて指定。
+3. Cloudflare Dashboard → Workers & Pages → `broadcast` → Settings → Variables and Secrets にSecret `GITHUB_MEDIA_TOKEN` を登録。**トークンはGitHubのリポジトリやチャットに貼らない**。
+4. WorkerにSecretを反映後、管理画面を再読み込み。画像を選択してプレビュー・保存できることを確認。
 
-リポジトリの `cloudflare.config.ts` には `MEDIA: bindings.r2({ name: "broadcast-media" })` が記載済みです。R2は非公開バケットとして構成し、画像はWorkerの `/media/...` 経由で配信します（Instagramが取得するため画像URL自体は公開）。バケット全体をパブリック公開する必要はありません。
+GitHubへの画像保存は `POST /api/media` で行います。Googleログインと同一オリジンを必須とし、JPEG/PNG/WebPのみ・8MB以内を検証します。成功時は公開Raw URLを返します。
 
-アップロードAPIは8MB以内のJPEG/PNG/WebPのみ受け付け、Google認証・同一オリジンを必須とします。ユーザーが投稿の保存・承認前にアップロードしたファイルもR2上に残るため、不要画像の定期削除は運用上の追加課題です。
+GitHubのレート制限・画像コミットの蓄積があるため、頻繁な大量アップロード用途には向きません。画像を選んだ後に投稿の保存を中止した場合、GitHubには画像ファイルが残る可能性があります。Instagramが画像を取得できるよう公開リポジトリを使用します。
+
+Xへの画像添付は未実装です。Instagramへの実投稿はSNS側の認証・動作検証が別途必要です。
