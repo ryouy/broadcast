@@ -134,7 +134,7 @@ async function admin(req:Request,env:Env,url:URL){
   }
   return json({id,created:platforms.length,status:"pending_review"},201);
  }
- if(req.method==="PUT"&&/^\\/api\\/posts\\/[a-f0-9-]{36}$/.test(url.pathname)){
+ if(req.method==="PUT"&&url.pathname.startsWith("/api/posts/")&&/^[a-f0-9-]{36}$/.test(url.pathname.slice("/api/posts/".length))){
   const eventId=url.pathname.split("/").pop()!;
   const body:any=await req.json().catch(()=>null);
   if(!body||typeof body.text!=="string")return error("本文を入力してください");
