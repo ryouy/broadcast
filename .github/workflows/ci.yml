@@ -19,3 +19,4 @@ jobs:
         run: |
           echo "homepage_status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://broadcast.ryouy.workers.dev/)"
           echo "api_status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://broadcast.ryouy.workers.dev/api/status)"
+          echo "auth_config=$(curl --silent --show-error --max-time 12 https://broadcast.ryouy.workers.dev/api/auth/config)"
