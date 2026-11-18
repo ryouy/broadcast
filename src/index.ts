@@ -90,6 +90,13 @@ async function admin(req:Request,env:Env,url:URL){
  if(req.method==="POST"&&match){
   const [ ,id,action]=match;
   if(!safeId(id))return error("Invalid ID");
+  if(action==="approve"){
+   const delivery=await env.DB.prepare("SELECT platform,image_url FROM deliveries WHERE id=? AND status='pending_review'").bind(id).first<{platform:string;image_url:string|null}>();
+   if(!delivery)return json({updated:0});
+   if(delivery.platform==="x"&&!env.X_USER_ACCESS_TOKEN)return error("Xの連携が未設定です。投稿はまだできません",409);
+   if(delivery.platform==="instagram"&&(!env.INSTAGRAM_ACCESS_TOKEN||!env.INSTAGRAM_USER_ID))return error("Instagramの連携が未設定です。投稿はまだできません",409);
+   if(delivery.platform==="x"&&delivery.image_url)return error("Xへの画像投稿にはまだ対応していません",409);
+  }
   const result=await env.DB.prepare(action==="approve"?"UPDATE deliveries SET status='scheduled',scheduled_at=datetime('now') WHERE id=? AND status='pending_review'":"UPDATE deliveries SET status='skipped' WHERE id=? AND status IN ('pending_review','scheduled')").bind(id).run();
   return json({updated:result.meta.changes});
  }
