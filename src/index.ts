@@ -85,7 +85,7 @@ async function admin(req:Request,env:Env,url:URL){
   if(!(type==="image/jpeg"&&jpeg||type==="image/png"&&png||type==="image/webp"&&webp))return error("画像形式が正しくありません",415);
   // GitHub Contents API requires base64. Convert in chunks to avoid a large argument list.
   const githubRepo=(env.GITHUB_MEDIA_REPO||"ryouy/broadcast").trim();
-  if(!/^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$/.test(githubRepo))return error("画像保存先の設定が不正です",503);
+  if(githubRepo.split("/").length!==2||!githubRepo.split("/").every(p=>/^[a-zA-Z0-9_.-]+$/.test(p)))return error("画像保存先の設定が不正です",503);
   const key=uid()+"."+extensions[type];
   const path="media/"+key;
   let raw="";
