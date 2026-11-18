@@ -60,6 +60,10 @@ describe("dashboard", () => {
   expect(source).not.toContain('id="newSource"');
   expect(source).toContain('id="queue-paging"');
   expect(source).toContain('class="delivery-list"');
+  expect(source).toContain('post-body-clamped');
+  expect(source).toContain('全文を表示');
+  expect(source).toContain('post-body-expanded');
+  expect(source).toContain('aria-expanded');
   expect(source).toContain('class="form-area"');
  });
  it("client-side JavaScript parses without syntax errors", () => {
