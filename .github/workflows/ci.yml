@@ -32,15 +32,14 @@ jobs:
         run: |
           curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q 'id="post-file"'
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST https://broadcast.ryouy.workers.dev/api/media)" = "401"
+      - name: Verify live multiple-image gallery controls
+        run: |
+          page=$(curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/)
+          printf '%s' "$page" | grep -q 'id="image-dialog"'
+          printf '%s' "$page" | grep -q 'multiple aria-describedby="upload-help"'
+          printf '%s' "$page" | grep -q 'function showImage(urls,index)'
       - name: Verify public Google auth configuration
         run: |
           config=$(curl --fail --silent --show-error --max-time 15 https://broadcast.ryouy.workers.dev/api/auth/config)
           echo "$config"
           test "$config" = '{"mode":"google"}'
-      - name: Package multi-image dashboard for deployment
-        run: |
-          npx esbuild src/index.ts --bundle --platform=browser --format=esm --target=es2022 --outfile=worker-bundle.js
-          echo BROADCAST_BUNDLE_START
-          base64 -w0 worker-bundle.js
-          echo
-          echo BROADCAST_BUNDLE_END
