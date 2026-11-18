@@ -285,37 +285,126 @@ const page=`<!doctype html>
 .platform{font-size:11px}
 .login{border-radius:12px;box-shadow:0 10px 30px #00000008}
 @media(max-width:620px){.nav a span{display:inline}.nav a{font-size:11px;padding:8px 5px}.sidebar{padding:14px 12px}.brand{font-size:16px}}
+
+/* Three focused top-level views, shared across phone and desktop */
+.shell{display:flex;flex-direction:column;max-width:1380px;min-height:100vh}
+.sidebar{height:68px;min-height:68px;padding:0 clamp(18px,3vw,42px);border:0;border-bottom:1px solid var(--line);display:flex;flex-direction:row;align-items:center;gap:clamp(14px,3vw,50px)}
+.brand{font-size:19px;padding:0;white-space:nowrap}
+.nav{display:flex;flex-direction:row;align-items:center;gap:22px;height:100%}
+.nav a{height:100%;padding:3px 1px 0;display:flex;align-items:center;justify-content:center;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;font-size:13px;color:#777;white-space:nowrap}
+.nav a.active{background:transparent;color:var(--ink);border-bottom-color:var(--ink)}
+.nav a:hover{background:transparent;color:#222;text-decoration:none}
+.top-actions{margin-left:auto;display:flex;gap:8px;align-items:center;white-space:nowrap}
+.content{width:100%;min-width:0;max-width:100%;flex:1;display:flex;flex-direction:column;padding:25px clamp(18px,3vw,42px) 20px}
+.heading{margin:0 0 12px;align-items:center;flex-shrink:0}
+.heading h1{font-size:25px;margin:0;line-height:1.4}
+#notice{margin:0 0 12px;min-height:15px;flex-shrink:0}
+.stats{flex-shrink:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 22px}
+.stat{min-height:90px;padding:17px 20px}
+.stat-label{margin-bottom:12px}
+.stat strong{font-size:29px}
+.workspace-panels{display:grid;gap:18px;grid-template-columns:1fr;flex:1;min-height:0}
+.section{display:flex;flex-direction:column;margin:0;min-height:0;min-width:0}
+.section-head{margin:0 0 11px;flex-shrink:0}
+.section-head h2{font-size:16px}
+.section .panel{min-height:0;flex:1}
+.paging{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px}
+.paging button{padding:5px 10px;border:1px solid var(--line);border-radius:7px;background:var(--paper);cursor:pointer}
+.paging button:disabled{opacity:.4}
+.paging span{font-size:12px;color:var(--muted)}
+body[data-view="overview"] #sources-section,
+body[data-view="overview"] #add-section,
+body[data-view="queue"] #sources-section,
+body[data-view="queue"] #add-section,
+body[data-view="sources"] #queue-section{display:none}
+body[data-view="queue"] .stats,
+body[data-view="sources"] .stats{display:none}
+body[data-view="sources"] .workspace-panels{grid-template-columns:minmax(0,1fr) minmax(280px,.9fr)}
+body[data-view="overview"] .workspace-panels,
+body[data-view="queue"] .workspace-panels{grid-template-columns:minmax(0,1fr)}
+body[data-view="overview"] #queue-section,
+body[data-view="queue"] #queue-section{display:flex}
+body[data-view="sources"] #sources-section,
+body[data-view="sources"] #add-section{display:flex}
+body[data-view="overview"] .delivery-copy{max-width:850px}
+.section-meta{font-size:12px}
+@media(min-width:901px){
+ html,body{height:100%;overflow:hidden}
+ .shell{height:100dvh;min-height:0;overflow:hidden;grid-template-columns:unset}
+ .sidebar{height:68px;min-height:68px;padding:0 clamp(18px,3vw,42px);gap:clamp(14px,3vw,50px)}
+ .content{height:auto;max-height:calc(100dvh - 68px);padding:23px clamp(18px,3vw,42px) 17px;overflow:hidden}
+ .heading{margin-bottom:9px}
+ .stats{margin-bottom:15px}
+ .stat{min-height:79px;padding:12px 19px}
+ .stat-label{margin-bottom:8px}
+ .workspace-panels{gap:16px}
+ .panel{overflow:hidden}
+ .delivery{padding:13px 17px}
+ .list-row{padding:14px 16px}
+ .delivery-copy{font-size:12px;-webkit-line-clamp:2}
+ .settings{grid-template-columns:1fr 1fr;padding:20px;gap:12px}
+ .field input,.field select{height:40px}
+ .section{margin:0}
+}
+@media(max-width:900px){
+ .shell{display:flex;min-height:100vh}
+ .sidebar{height:auto;min-height:0;display:flex;flex-wrap:wrap;padding:13px 18px 0;gap:10px 18px}
+ .brand{font-size:17px}
+ .top-actions{order:2;margin-left:auto}
+ .nav{order:3;width:100%;height:42px;gap:24px}
+ .nav a{height:42px;padding:0 1px;font-size:13px}
+ .content{padding:20px 18px 35px}
+ .workspace-panels{display:block}
+ .section{margin:0 0 22px}
+ .section .panel{flex:auto}
+ body[data-view="sources"] .workspace-panels{display:block}
+ .stats{margin-bottom:23px}
+ .paging{display:none}
+}
+@media(max-width:520px){
+ .sidebar{padding:12px 14px 0}
+ .nav{gap:18px}
+ .nav a{font-size:12px}
+ .top-actions .secondary{font-size:11px;padding:8px}
+ .brand{font-size:16px}
+ .content{padding:19px 14px 32px}
+ .heading h1{font-size:23px}
+ .stats{gap:8px}
+ .stat{padding:14px 11px;min-height:84px}
+ .stat-label{font-size:10px;margin-bottom:13px}
+ .stat strong{font-size:25px}
+}
 </style>
 </head>
 <body>
 <div class="shell">
-<aside class="sidebar">
-  <a href="#overview" class="brand">Broadcast</a>
+<header class="sidebar">
+  <a href="#overview" class="brand" id="brand-link">Broadcast</a>
   <nav class="nav" aria-label="セクション">
-    <a class="active" href="#overview"><span>概要</span></a>
-    <a href="#sources-section"><span>監視ソース</span></a>
-    <a href="#queue-section"><span>投稿キュー</span></a>
+    <a class="active" href="#overview"><span>ホーム</span></a>
+    <a href="#sources-section"><span>更新元の設定</span></a>
+    <a href="#queue-section"><span>投稿の確認</span></a>
   </nav>
-</aside>
+  <div class="top-actions"><button class="secondary" id="refresh" type="button">再読み込み</button><button class="secondary" id="logout" style="display:none">ログアウト</button></div>
+</header>
 <main class="content" id="overview">
-  <div class="top"><div class="top-actions"><button class="secondary" id="logout" style="display:none">ログアウト</button><button class="secondary" id="refresh" type="button">再読み込み</button></div></div>
-  <div class="heading"><div><h1 id="page-title">概要</h1></div><button class="secondary" id="check-now">更新を確認</button></div>
+  <div class="heading"><div><h1 id="page-title">ホーム</h1></div><button class="secondary" id="check-now">新着を確認</button></div>
   <p id="notice" role="status" aria-live="polite"></p>
   <div class="stats">
-    <div class="stat"><div class="stat-label">監視ソース</div><strong id="stat-sources">—</strong></div>
-    <div class="stat"><div class="stat-label">承認待ち</div><strong id="stat-pending">—</strong></div>
-    <div class="stat"><div class="stat-label">公開済み</div><strong id="stat-published">—</strong></div>
+    <div class="stat"><div class="stat-label">登録した更新元</div><strong id="stat-sources">—</strong></div>
+    <div class="stat"><div class="stat-label">確認待ちの投稿</div><strong id="stat-pending">—</strong></div>
+    <div class="stat"><div class="stat-label">投稿済み</div><strong id="stat-published">—</strong></div>
   </div>
   <div class="workspace-panels">
-  <section class="section" id="sources-section"><div class="section-head"><h2>監視ソース</h2><span class="section-meta" id="source-count">0 sources</span></div><div class="panel" id="sources"><div class="empty">認証後に表示します。</div></div><div class="paging" id="sources-paging"></div></section>
-  <section class="section" id="queue-section"><div class="section-head"><h2>投稿キュー</h2><span class="section-meta" id="queue-count">0 posts</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div><div class="paging" id="queue-paging"></div></section>
-  <section class="section" id="add-section"><div class="section-head"><h2>ソースを追加</h2></div>
+  <section class="section" id="sources-section"><div class="section-head"><h2>登録済みの更新元</h2><span class="section-meta" id="source-count">0 sources</span></div><div class="panel" id="sources"><div class="empty">認証後に表示します。</div></div><div class="paging" id="sources-paging"></div></section>
+  <section class="section" id="queue-section"><div class="section-head"><h2 id="queue-heading">最近の投稿</h2><span class="section-meta" id="queue-count">0 posts</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div><div class="paging" id="queue-paging"></div></section>
+  <section class="section" id="add-section"><div class="section-head"><h2>更新元を追加</h2></div>
     <div class="panel"><form class="settings" id="newSource">
       <div class="field"><label for="kind">種類</label><select id="kind"><option value="github">GitHub リリース</option><option value="rss">RSS / Atom</option></select></div>
       <div class="field"><label for="name">表示名</label><input id="name" type="text" required maxlength="100" placeholder="ソース名"></div>
       <div class="field full"><label for="url">URL</label><input id="url" type="url" required placeholder="https://github.com/owner/repo"></div>
       <div class="field full"><label for="image">Instagram用画像URL（任意）</label><input id="image" type="url" placeholder="https://example.com/cover.jpg"></div>
-      <div class="form-bottom"><div class="checks"><label><input id="x" type="checkbox" checked>X</label><label><input id="ig" type="checkbox">Instagram</label></div><button type="submit" class="primary" id="add">ソースを追加</button></div>
+      <div class="form-bottom"><div class="checks"><label><input id="x" type="checkbox" checked>X</label><label><input id="ig" type="checkbox">Instagram</label></div><button type="submit" class="primary" id="add">登録する</button></div>
     </form></div>
   </section>
   </div>
@@ -337,7 +426,7 @@ let isAuthenticated=false;
 let allSources=[],allDeliveries=[],sourcePage=0,queuePage=0;
 const desktop=()=>window.matchMedia("(min-width:901px)").matches;
 const view=()=>document.body.dataset.view||"overview";
-function setView(v){if(!["overview","sources","queue"].includes(v))v="overview";document.body.dataset.view=v;const title=({overview:"概要",sources:"監視ソース",queue:"投稿キュー"})[v];$("page-title").textContent=title;document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active",a.getAttribute("href")===(v==="overview"?"#overview":v==="sources"?"#sources-section":"#queue-section")));renderSources(allSources);renderQueue(allDeliveries);}
+function setView(v){if(!["overview","sources","queue"].includes(v))v="overview";document.body.dataset.view=v;const title=({overview:"ホーム",sources:"更新元の設定",queue:"投稿の確認"})[v];$("page-title").textContent=title;$("queue-heading").textContent=v==="overview"?"最近の投稿":"投稿一覧";document.querySelectorAll(".nav a").forEach(a=>{const active=a.getAttribute("href")===(v==="overview"?"#overview":v==="sources"?"#sources-section":"#queue-section");a.classList.toggle("active",active);if(active)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});renderSources(allSources);renderQueue(allDeliveries);}
 function pageControls(id,total,page,size,onClick){const p=$(id);p.replaceChildren();if(!desktop()||total<=size)return;const count=Math.ceil(total/size);p.append(el("span",null,(page+1)+" / "+count));for(const [label,n] of [["前へ",page-1],["次へ",page+1]]){const b=el("button",null,label);b.type="button";b.disabled=n<0||n>=count;b.addEventListener("click",()=>onClick(n));p.append(b);}}
 
 const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=String(txt);return e;};
@@ -357,7 +446,7 @@ function renderSources(sources){
  allSources=sources;const panel=$("sources");panel.replaceChildren();
  const size=desktop()?4:Infinity;if(sourcePage*size>=sources.length)sourcePage=0;
  pageControls("sources-paging",sources.length,sourcePage,size,n=>{sourcePage=n;renderSources(allSources);});
- if(!sources.length){const empty=el("div","empty");empty.append(el("strong",null,"監視ソースはありません"),el("span",null,""));panel.append(empty);return;}
+ if(!sources.length){const empty=el("div","empty");empty.append(el("strong",null,"登録した更新元はありません"),el("span",null,""));panel.append(empty);return;}
  for(const s of sources.slice(sourcePage*size,sourcePage*size+size)){
    const row=el("div","list-row");const ico=el("div","source-icon",s.type==="github"?"Git":"RSS");
    const rec=el("div","record");rec.append(el("div","record-title",s.name));
@@ -374,7 +463,7 @@ function renderQueue(items){
  allDeliveries=items;const panel=$("deliveries");panel.replaceChildren();
  const size=desktop()?(view()==="queue"?5:3):Infinity;if(queuePage*size>=items.length)queuePage=0;
  pageControls("queue-paging",items.length,queuePage,size,n=>{queuePage=n;renderQueue(allDeliveries);});
- if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"投稿はありません"),el("span",null,""));panel.append(empty);return;}
+ if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"まだ投稿はありません"),el("span",null,""));panel.append(empty);return;}
  for(const d of items.slice(queuePage*size,queuePage*size+size)){
   const item=el("div","delivery");const top=el("div","delivery-top");
   const platform=el("div","platform",d.platform==="x"?"X":"IG");platform.title=d.platform;
@@ -405,7 +494,10 @@ async function act(id,action,title){
  catch(e){notice(String(e),true);}
 }
 document.body.dataset.view="overview";
-document.querySelectorAll(".nav a").forEach(a=>a.addEventListener("click",ev=>{if(desktop()){ev.preventDefault();const h=a.getAttribute("href");setView(h==="#sources-section"?"sources":h==="#queue-section"?"queue":"overview");}}));
+function navigationFromHash(){const h=location.hash;setView(h==="#sources-section"?"sources":h==="#queue-section"?"queue":"overview");}
+document.querySelectorAll(".nav a, #brand-link").forEach(a=>a.addEventListener("click",ev=>{ev.preventDefault();const h=a.getAttribute("href");history.replaceState(null,"",h);navigationFromHash();}));
+window.addEventListener("hashchange",navigationFromHash);
+navigationFromHash();
 window.addEventListener("resize",()=>{renderSources(allSources);renderQueue(allDeliveries);});
 async function initAuth(){
  try{
@@ -436,12 +528,12 @@ $("check-now").addEventListener("click",async()=>{
  const b=$("check-now");b.disabled=true;b.textContent="確認中…";
  try{await api("/api/check",{method:"POST"});await load();notice("更新を確認しました。");}
  catch(e){notice("更新確認に失敗しました: "+String(e),true);}
- finally{b.disabled=false;b.textContent="更新を確認";}
+ finally{b.disabled=false;b.textContent="新着を確認";}
 });
 $("newSource").addEventListener("submit",async ev=>{
  ev.preventDefault();if(!isAuthenticated)return;
  const b=$("add");b.disabled=true;
- try{await api("/api/sources",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:$("kind").value,name:$("name").value,url:$("url").value,default_image_url:$("image").value||null,post_x:$("x").checked,post_instagram:$("ig").checked})});$("newSource").reset();await load();notice("ソースを追加しました。");}
+ try{await api("/api/sources",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:$("kind").value,name:$("name").value,url:$("url").value,default_image_url:$("image").value||null,post_x:$("x").checked,post_instagram:$("ig").checked})});$("newSource").reset();await load();notice("更新元を登録しました。");}
  catch(e){notice("追加できませんでした: "+String(e),true);}
  finally{b.disabled=false;}
 });
