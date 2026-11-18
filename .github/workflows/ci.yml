@@ -22,18 +22,14 @@ jobs:
           echo "auth_config=$(curl --silent --show-error --max-time 12 https://broadcast.ryouy.workers.dev/api/auth/config)"
       - name: Verify deployed Japanese UI and favicon
         run: |
-          curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q "投稿の確認"
-          curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q "更新元の設定"
+          curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q "投稿を作成"
+          curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q "投稿一覧"
           curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/favicon.svg | grep -q "<svg"
+      - name: Verify retired webhook is unavailable
+        run: |
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST https://broadcast.ryouy.workers.dev/webhooks/github)" = "404"
       - name: Verify public Google auth configuration
         run: |
           config=$(curl --fail --silent --show-error --max-time 15 https://broadcast.ryouy.workers.dev/api/auth/config)
           echo "$config"
           test "$config" = '{"mode":"google"}'
-      - name: Package direct-publishing Worker
-        run: |
-          npx esbuild src/index.ts --bundle --platform=browser --format=esm --target=es2022 --outfile=worker-bundle.js
-          echo BROADCAST_BUNDLE_START
-          base64 -w0 worker-bundle.js
-          echo
-          echo BROADCAST_BUNDLE_END
