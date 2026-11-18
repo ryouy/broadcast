@@ -4,7 +4,7 @@ import { compose, githubSignatureValid, normalizeText, sourceKey } from "./core"
 
 interface Env {
  DB: D1Database;
- ADMIN_TOKEN?: string; GITHUB_WEBHOOK_SECRET?: string;
+ GITHUB_WEBHOOK_SECRET?: string;
  GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; SESSION_SECRET?: string; ALLOWED_EMAILS?: string;
  X_USER_ACCESS_TOKEN?: string; INSTAGRAM_ACCESS_TOKEN?: string; INSTAGRAM_USER_ID?: string;
 }
@@ -133,11 +133,8 @@ async function dispatch(env:Env){
 }
 async function admin(req:Request,env:Env,url:URL){
  const mode=authMode(env);
- if(mode==="unconfigured")return error("Google OAuth configuration incomplete",503);
- if(mode==="google"){if(!await session(req,env))return error("Unauthorized",401);}
- else {if(!env.ADMIN_TOKEN)return error("ADMIN_TOKEN not configured",503);
- const h=req.headers.get("authorization")||"";
- if(h!=="Bearer "+env.ADMIN_TOKEN)return error("Unauthorized",401);}
+ if(mode!=="google")return error("Google OAuth configuration incomplete",503);
+ if(!await session(req,env))return error("Unauthorized",401);
  if(req.method!=="GET"&&!sameOrigin(req))return error("Invalid request origin",403);
  if(req.method==="POST"&&url.pathname==="/api/check"){await poll(env);return json({ok:true});}
  if(req.method==="GET"&&url.pathname==="/api/status"){
@@ -305,15 +302,14 @@ const page=`<!doctype html>
   <div class="brand"><span class="brand-icon">↗</span>broadcast</div>
   <h2>管理画面</h2><p>管理トークンを入力してください。</p>
   <button class="primary" id="google-login" type="button" style="display:none">Googleでログイン</button>
-  <form id="login-form" style="display:none"><div class="field"><label for="token">ADMIN TOKEN</label><input id="token" type="password" autocomplete="off" required placeholder="管理トークン"></div><button class="primary" id="login-button" type="submit">ログイン</button></form>
+
   <p id="login-message" role="alert"></p>
 </div></div>
 <script>
 (function(){
 "use strict";
 const $=id=>document.getElementById(id);
-let token="";
-let authMethod="token";
+let isAuthenticated=false;
 let allSources=[],allDeliveries=[],sourcePage=0,queuePage=0;
 const desktop=()=>window.matchMedia("(min-width:901px)").matches;
 const view=()=>document.body.dataset.view||"overview";
@@ -323,10 +319,9 @@ function pageControls(id,total,page,size,onClick){const p=$(id);p.replaceChildre
 const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=String(txt);return e;};
 function notice(msg,bad=false){$("notice").textContent=msg;$("notice").classList.toggle("error",bad);}
 async function api(path,init={}){
- const headers={...(authMethod==="token"?{"authorization":"Bearer "+token}:{}),...(init.headers||{})};
- const r=await fetch(path,{...init,credentials:"same-origin",headers});
+ const r=await fetch(path,{...init,credentials:"same-origin"});
  const body=await r.json().catch(()=>null);
- if(!r.ok)throw Error(r.status===401?"認証情報が正しくありません。":r.status===503?"CloudflareのADMIN_TOKEN設定を確認してください。":body?.error||"HTTP "+r.status);
+ if(!r.ok)throw Error(r.status===401?"ログインの有効期限が切れました。再ログインしてください。":r.status===503?"Google OAuthの設定を確認してください。":body?.error||"HTTP "+r.status);
  return body;
 }
 function statusName(s){return ({pending_review:"承認待ち",scheduled:"公開待ち",processing:"送信中",published:"公開済み",failed:"失敗",unknown:"要確認",skipped:"スキップ"})[s]||s;}
@@ -389,19 +384,20 @@ document.querySelectorAll(".nav a").forEach(a=>a.addEventListener("click",ev=>{i
 window.addEventListener("resize",()=>{renderSources(allSources);renderQueue(allDeliveries);});
 async function initAuth(){
  try{
-  const res=await fetch("/api/auth/config",{cache:"no-store"});const c=await res.json();authMethod=c.mode;
-  if(authMethod==="google"){
-   $("google-login").style.display="block";$("login-form").style.display="none";
+  const res=await fetch("/api/auth/config",{cache:"no-store"});
+  if(!res.ok)throw Error("認証設定の取得に失敗しました。");
+  const config=await res.json();
+  if(config.mode!=="google"){$("login-message").textContent="Google OAuthの設定が完了していません。";return;}
+  $("google-login").style.display="block";
+  const check=await fetch("/api/auth/session",{credentials:"same-origin",cache:"no-store"});
+  if(check.ok){
+   isAuthenticated=true;
    $("logout").style.display="inline-flex";
-   const check=await fetch("/api/auth/session",{credentials:"same-origin",cache:"no-store"});
-   if(check.ok){await load();$("lock").classList.add("hidden");}
-   const authError=new URL(location.href).searchParams.get("auth_error");
-   if(authError)$("login-message").textContent=authError==="denied"?"このGoogleアカウントは許可されていません。":"Googleログインに失敗しました。もう一度お試しください。";
-  }else if(authMethod==="token"){
-   $("login-form").style.display="block";$("google-login").style.display="none";
-  }else{
-   $("login-message").textContent="Google OAuthの設定が完了していません。管理者に連絡してください。";
+   $("lock").classList.add("hidden");
+   try{await load();}catch(e){notice("データの取得に失敗しました。更新してください。",true);}
   }
+  const authError=new URL(location.href).searchParams.get("auth_error");
+  if(authError)$("login-message").textContent=authError==="denied"?"このGoogleアカウントは許可されていません。":"Googleログインに失敗しました。もう一度お試しください。";
  }catch(e){$("login-message").textContent="認証設定を読み込めませんでした。";}
 }
 $("google-login").addEventListener("click",()=>{window.location.assign("/auth/google");});
@@ -409,23 +405,16 @@ $("logout").addEventListener("click",async()=>{
  try{await fetch("/auth/logout",{method:"POST",credentials:"same-origin"});}finally{window.location.assign("/");}
 });
 void initAuth();
-$("login-form").addEventListener("submit",async ev=>{
- ev.preventDefault();token=$("token").value.trim();if(!token)return;
- const btn=$("login-button");btn.disabled=true;btn.textContent="認証中…";$("login-message").textContent="";
- try{await load();$("lock").classList.add("hidden");$("token").value="";}
- catch(e){$("login-message").textContent=String(e);}
- finally{btn.disabled=false;btn.textContent="ログイン";}
-});
-$("refresh").addEventListener("click",()=>{if(!token)return;load().catch(()=>{});});
+$("refresh").addEventListener("click",()=>{if(!isAuthenticated)return;load().catch(()=>{});});
 $("check-now").addEventListener("click",async()=>{
- if(!token)return;
+ if(!isAuthenticated)return;
  const b=$("check-now");b.disabled=true;b.textContent="確認中…";
  try{await api("/api/check",{method:"POST"});await load();notice("更新を確認しました。");}
  catch(e){notice("更新確認に失敗しました: "+String(e),true);}
  finally{b.disabled=false;b.textContent="更新を確認";}
 });
 $("newSource").addEventListener("submit",async ev=>{
- ev.preventDefault();if(!token)return;
+ ev.preventDefault();if(!isAuthenticated)return;
  const b=$("add");b.disabled=true;
  try{await api("/api/sources",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:$("kind").value,name:$("name").value,url:$("url").value,default_image_url:$("image").value||null,post_x:$("x").checked,post_instagram:$("ig").checked})});$("newSource").reset();await load();notice("ソースを追加しました。");}
  catch(e){notice("追加できませんでした: "+String(e),true);}
