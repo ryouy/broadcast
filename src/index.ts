@@ -465,7 +465,7 @@ async function load(){
   connections=status.connections||{x:false,instagram:false};
   mediaEnabled=status.media_enabled===true;
   $("post-file").disabled=!mediaEnabled;
-  $("upload-help").textContent=mediaEnabled?"JPEG・PNG・WebP / 8MB以内":"画像保存用のGitHub認証が未設定です";
+  renderSelectedImages();
   renderQueue(items);
   notice("");
  }catch(e){notice("読み込みに失敗しました: "+String(e),true);}
@@ -482,39 +482,56 @@ async function act(item,action){
   await load();
  }catch(e){notice(String(e),true);}
 }
-let mediaEnabled=false,selectedObjectUrl=null;
-function clearImage(){
+let mediaEnabled=false,selectedFiles=[],selectedPreviews=[];
+function clearImages(){
+ selectedPreviews.forEach(url=>URL.revokeObjectURL(url));
+ selectedFiles=[];selectedPreviews=[];
  $("post-file").value="";
- $("post-image").value="";
- $("image-preview").hidden=true;
- $("preview-image").removeAttribute("src");
- if(selectedObjectUrl){URL.revokeObjectURL(selectedObjectUrl);selectedObjectUrl=null;}
+ renderSelectedImages();
 }
-$("clear-image").addEventListener("click",clearImage);
-$("post-file").addEventListener("change",()=>{
- clearImagePreviewOnly();
- const file=$("post-file").files?.[0];
- if(!file)return;
- if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>8_000_000||file.size===0){
-  notice("JPEG・PNG・WebPの画像を8MB以内で選んでください。",true);
-  $("post-file").value="";return;
+function renderSelectedImages(){
+ const box=$("image-preview");box.replaceChildren();
+ selectedFiles.forEach((file,i)=>{
+  const wrapper=el("div","upload-thumb");
+  const img=el("img");img.src=selectedPreviews[i];img.alt="選択した画像 "+(i+1);
+  wrapper.append(img,el("span","hint",(i+1)+"枚目"));
+  const remove=el("button","secondary","削除");remove.type="button";
+  remove.addEventListener("click",()=>{
+   URL.revokeObjectURL(selectedPreviews[i]);
+   selectedFiles.splice(i,1);selectedPreviews.splice(i,1);renderSelectedImages();
+  });
+  wrapper.append(remove);box.append(wrapper);
+ });
+ $("upload-help").textContent=mediaEnabled?"画像 "+selectedFiles.length+" / 4枚・1枚8MB以内（JPEG・PNG・WebP）":"画像保存のGitHub設定が必要です";
+}
+function addImages(files){
+ if(!mediaEnabled){notice("画像保存のGitHub設定が必要です",true);return;}
+ const incoming=[...files];
+ if(selectedFiles.length+incoming.length>4){notice("画像は1投稿につき4枚までです",true);return;}
+ for(const file of incoming){
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size===0||file.size>8_000_000){
+   notice("JPEG・PNG・WebPの画像を、1枚8MB以内で選んでください",true);return;
+  }
  }
- selectedObjectUrl=URL.createObjectURL(file);
- $("preview-image").src=selectedObjectUrl;
- $("image-preview").hidden=false;
-});
-function clearImagePreviewOnly(){
- if(selectedObjectUrl){URL.revokeObjectURL(selectedObjectUrl);selectedObjectUrl=null;}
- $("image-preview").hidden=true;
- $("post-image").value="";
+ incoming.forEach(file=>{selectedFiles.push(file);selectedPreviews.push(URL.createObjectURL(file));});
+ renderSelectedImages();
+ notice("");
 }
-async function uploadSelectedImage(){
- const file=$("post-file").files?.[0];
- if(!file)return "";
- if(!mediaEnabled)throw Error("画像保存用のGitHub認証が未設定です");
- const response=await api("/api/media",{method:"POST",headers:{"content-type":file.type},body:file});
- if(typeof response.url!=="string")throw Error("画像アップロードに失敗しました");
- return response.url;
+$("post-file").addEventListener("change",e=>{addImages(e.target.files||[]);e.target.value="";});
+const dropZone=document.querySelector(".file-choose");
+dropZone.addEventListener("dragover",e=>{e.preventDefault();});
+dropZone.addEventListener("drop",e=>{e.preventDefault();addImages(e.dataTransfer?.files||[]);});
+async function uploadSelectedImages(){
+ if(selectedFiles.length&&!mediaEnabled)throw Error("画像保存のGitHub設定が必要です");
+ const urls=[];
+ for(let i=0;i<selectedFiles.length;i++){
+  notice("画像を保存中… "+(i+1)+" / "+selectedFiles.length+"枚");
+  const file=selectedFiles[i];
+  const response=await api("/api/media",{method:"POST",headers:{"content-type":file.type},body:file});
+  if(typeof response.url!=="string")throw Error("画像 "+(i+1)+" の保存に失敗しました");
+  urls.push(response.url);
+ }
+ return urls;
 }
 function countChars(){
  const count=$("post-text").value.length;
@@ -530,13 +547,12 @@ $("newPost").addEventListener("submit",async e=>{
  if(!message)return notice("文章を入力してください。",true);
  if(!x&&!instagram)return notice("投稿先を選んでください。",true);
  if(x&&message.length>280)return notice("Xへの投稿は280文字以内にしてください。",true);
- if(instagram&&!$("post-file").files?.length)return notice("Instagramには画像が必要です。",true);
+ if(instagram&&!selectedFiles.length)return notice("Instagramには画像が必要です。",true);
  const button=$("save-post");button.disabled=true;
  try{
-  if($("post-file").files?.length)notice("画像をアップロードしています…");
-  const image=await uploadSelectedImage();
-  await api("/api/posts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:message,image_url:image,x,instagram})});
-  $("newPost").reset();clearImage();countChars();await load();goTo("#queue-section");
+  const images=await uploadSelectedImages();
+  await api("/api/posts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:message,image_urls:images,x,instagram})});
+  $("newPost").reset();clearImages();countChars();await load();goTo("#queue-section");
   notice("確認待ちに保存しました。内容を確認してから承認できます。");
  }catch(err){notice("保存できませんでした: "+String(err),true);}
  finally{button.disabled=false;}
