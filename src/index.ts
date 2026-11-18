@@ -325,7 +325,7 @@ textarea:focus,.text-input:focus{border-color:#555}
 #compose .checks{gap:24px}
 #compose .checks label{font-size:15px;display:inline-flex;gap:9px;align-items:center}
 #compose .checks input{width:17px;height:17px;margin:0}
-#compose .file-choose{height:76px;min-height:76px;display:flex!important;justify-content:center;align-items:center;gap:10px;padding:12px 16px;border-color:#cecece;border-radius:6px;background:#fafafa}
+#compose .file-choose{width:100%;max-width:330px;height:72px;min-height:72px;display:flex!important;justify-content:center;align-items:center;gap:7px;padding:11px 14px;border-color:#cecece;border-radius:6px;background:#fafafa}
 #compose .file-choose-title{font-size:14px;color:#222;font-weight:600}
 #compose .file-choose-note{font-size:12px;color:#777;font-weight:400}
 #compose .image-preview{margin-top:12px}
@@ -335,9 +335,11 @@ textarea:focus,.text-input:focus{border-color:#555}
  .main{padding:18px 16px 26px}
  #compose .form-area{max-width:none}
  #compose textarea{height:165px;min-height:135px}
- #compose .file-choose{height:82px;flex-direction:column;gap:2px}
+ #compose .file-choose{height:76px;max-width:330px;flex-direction:column;gap:2px}
  #compose .file-choose-note{width:auto}
 }
+.post-edit-button{margin-top:12px}
+#cancel-edit[hidden]{display:none}
 </style>
 </head>
 <body data-view="compose">
@@ -374,6 +376,7 @@ textarea:focus,.text-input:focus{border-color:#555}
    </div>
    <div class="form-actions">
     <button class="primary" id="save-post" type="submit">保存する</button>
+    <button class="secondary" id="cancel-edit" type="button" hidden>編集をやめる</button>
    </div>
   </form>
  </section>
@@ -514,6 +517,12 @@ function renderQueue(items){
    });
    row.append(gallery);
   }
+  if(item.is_manual&&entries.every(d=>d.status==="pending_review")){
+   const editButton=el("button","secondary post-edit-button","編集");
+   editButton.type="button";
+   editButton.addEventListener("click",()=>startEditing(entries));
+   row.append(editButton);
+  }
   for(const delivery of entries){
    const target=el("div","delivery-target");
    target.append(el("span","platform",delivery.platform==="x"?"X":"Instagram"));
@@ -555,7 +564,38 @@ async function act(item,action){
   await load();
  }catch(e){notice(String(e),true);}
 }
-let mediaEnabled=false,selectedFiles=[],selectedPreviews=[];
+let mediaEnabled=false,selectedFiles=[],selectedPreviews=[],existingImages=[],editingEventId=null;
+function resetEditor(){
+ editingEventId=null;
+ existingImages=[];
+ $("save-post").textContent="保存する";
+ $("cancel-edit").hidden=true;
+ $("newPost").reset();
+ clearImages();
+ countChars();
+}
+function startEditing(entries){
+ const item=entries[0];
+ editingEventId=item.event_id;
+ existingImages=getImages(item).slice();
+ selectedFiles=[];
+ selectedPreviews.forEach(url=>URL.revokeObjectURL(url));
+ selectedPreviews=[];
+ $("post-file").value="";
+ $("post-text").value=item.text;
+ $("post-x").checked=entries.some(d=>d.platform==="x");
+ $("post-ig").checked=entries.some(d=>d.platform==="instagram");
+ $("save-post").textContent="変更を保存";
+ $("cancel-edit").hidden=false;
+ renderSelectedImages();
+ countChars();
+ goTo("#compose");
+ $("post-text").focus();
+ window.scrollTo({top:0,behavior:"instant"});
+ notice("");
+}
+$("cancel-edit").addEventListener("click",()=>{resetEditor();notice("");});
+
 function clearImages(){
  selectedPreviews.forEach(url=>URL.revokeObjectURL(url));
  selectedFiles=[];selectedPreviews=[];
@@ -564,6 +604,14 @@ function clearImages(){
 }
 function renderSelectedImages(){
  const box=$("image-preview");box.replaceChildren();
+ existingImages.forEach((url,i)=>{
+  const wrapper=el("div","upload-thumb");
+  const img=el("img");img.src=url;img.alt="登録済み画像 "+(i+1);img.loading="lazy";
+  wrapper.append(img,el("span","hint","登録済み"));
+  const remove=el("button","secondary","削除");remove.type="button";
+  remove.addEventListener("click",()=>{existingImages.splice(i,1);renderSelectedImages();});
+  wrapper.append(remove);box.append(wrapper);
+ });
  selectedFiles.forEach((file,i)=>{
   const wrapper=el("div","upload-thumb");
   const img=el("img");img.src=selectedPreviews[i];img.alt="選択した画像 "+(i+1);
@@ -575,12 +623,12 @@ function renderSelectedImages(){
   });
   wrapper.append(remove);box.append(wrapper);
  });
- $("upload-help").textContent=mediaEnabled?(selectedFiles.length?"画像 "+selectedFiles.length+" / 4枚":""):"画像保存のGitHub設定が必要です";
+ $("upload-help").textContent=mediaEnabled?(existingImages.length+selectedFiles.length?"画像 "+(existingImages.length+selectedFiles.length)+" / 4枚":""):"画像保存のGitHub設定が必要です";
 }
 function addImages(files){
  if(!mediaEnabled){notice("画像保存のGitHub設定が必要です",true);return;}
  const incoming=[...files];
- if(selectedFiles.length+incoming.length>4){notice("画像は1投稿につき4枚までです",true);return;}
+ if(existingImages.length+selectedFiles.length+incoming.length>4){notice("画像は1投稿につき4枚までです",true);return;}
  for(const file of incoming){
   if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size===0||file.size>8_000_000){
    notice("JPEG・PNG・WebPの画像を、1枚8MB以内で選んでください",true);return;
@@ -620,13 +668,15 @@ $("newPost").addEventListener("submit",async e=>{
  if(!message)return notice("文章を入力してください。",true);
  if(!x&&!instagram)return notice("投稿先を選んでください。",true);
  if(x&&message.length>280)return notice("Xへの投稿は280文字以内にしてください。",true);
- if(instagram&&!selectedFiles.length)return notice("Instagramには画像が必要です。",true);
+ if(instagram&&!existingImages.length&&!selectedFiles.length)return notice("Instagramには画像が必要です。",true);
  const button=$("save-post");button.disabled=true;
  try{
-  const images=await uploadSelectedImages();
-  await api("/api/posts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:message,image_urls:images,x,instagram})});
-  $("newPost").reset();clearImages();countChars();await load();goTo("#queue-section");
-  notice("確認待ちに保存しました。内容を確認してから承認できます。");
+  const images=[...existingImages,...await uploadSelectedImages()];
+  const editing=Boolean(editingEventId);
+  const endpoint=editing?"/api/posts/"+encodeURIComponent(editingEventId):"/api/posts";
+  await api(endpoint,{method:editing?"PUT":"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:message,image_urls:images,x,instagram})});
+  resetEditor();await load();goTo("#queue-section");
+  notice(editing?"変更を保存しました。":"確認待ちに保存しました。");
  }catch(err){notice("保存できませんでした: "+String(err),true);}
  finally{button.disabled=false;}
 });
