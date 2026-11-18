@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
 import { SignJWT } from "jose";
 
 describe("direct publishing endpoint security", () => {
  const base="https://broadcast.ryouy.workers.dev";
+ afterEach(()=>vi.unstubAllGlobals());
  it("keeps manual drafts behind Google authentication",async()=>{
   const req=new Request(base+"/api/posts",{method:"POST",headers:{"origin":base,"content-type":"application/json"},body:JSON.stringify({text:"お知らせ",x:true})});
   const res=await worker.fetch(req,{DB:{} as any} as any);
@@ -29,37 +30,38 @@ describe("direct publishing endpoint security", () => {
   const poll=await worker.fetch(new Request(base+"/api/check",{method:"POST"}),env);
   expect(poll.status).toBe(503);
  });
- it("rejects image upload when R2 is unavailable",async()=>{
+ it("rejects image upload without GitHub token",async()=>{
   const baseSecret="test-session-secret-with-adequate-length";
   const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(baseSecret));
   const env={DB:{} as any,GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:baseSecret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
   const res=await worker.fetch(new Request(base+"/api/media",{method:"POST",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token,"Content-Type":"image/png"},body:new Uint8Array([137,80,78,71,13,10,26,10,0])}),env);
   expect(res.status).toBe(503);
  });
- it("accepts a valid PNG into R2 and makes it retrievable",async()=>{
+ it("uploads a valid PNG to the dedicated GitHub media branch",async()=>{
   const secret="test-session-secret-with-adequate-length";
   const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
-  const objects=new Map<string,Uint8Array>();
-  const bucket={
-   async put(key:string,data:Uint8Array){objects.set(key,data);return {};},
-   async get(key:string){const data=objects.get(key);return data?{body:new ReadableStream({start(c){c.enqueue(data);c.close();}}),httpMetadata:{contentType:"image/png"}}:null;}
-  };
-  const env={DB:{} as any,MEDIA:bucket,GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
+  const sent:any[]=[];
+  vi.stubGlobal("fetch",vi.fn(async (url:string,init:RequestInit)=>{
+   sent.push({url,init});
+   return new Response(JSON.stringify({content:{path:"media/example.png"}}),{status:201,headers:{"content-type":"application/json"}});
+  }));
+  const env={DB:{} as any,GITHUB_MEDIA_TOKEN:"github-test-token",GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
   const png=new Uint8Array([137,80,78,71,13,10,26,10,0]);
   const res=await worker.fetch(new Request(base+"/api/media",{method:"POST",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token,"Content-Type":"image/png"},body:png}),env);
   expect(res.status).toBe(201);
   const output=await res.json() as {url:string;key:string};
-  expect(output.url).toBe(base+"/media/"+output.key);
-  expect(objects.size).toBe(1);
-  const imageResponse=await worker.fetch(new Request(output.url),env);
-  expect(imageResponse.status).toBe(200);
-  expect(imageResponse.headers.get("content-type")).toBe("image/png");
-  expect(new Uint8Array(await imageResponse.arrayBuffer())).toEqual(png);
+  expect(output.url).toBe("https://raw.githubusercontent.com/ryouy/broadcast/broadcast-images/media/"+output.key);
+  expect(sent).toHaveLength(1);
+  expect(sent[0].url).toContain("https://api.github.com/repos/ryouy/broadcast/contents/media/");
+  expect(sent[0].init.headers.authorization).toBe("Bearer github-test-token");
+  const payload=JSON.parse(sent[0].init.body);
+  expect(payload.branch).toBe("broadcast-images");
+  expect(payload.content).toBe("iVBORw0KGgoA");
  });
  it("rejects an image with a forged media type",async()=>{
   const secret="test-session-secret-with-adequate-length";
   const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
-  const env={DB:{} as any,MEDIA:{put:async()=>{throw Error("must not save");}},GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
+  const env={DB:{} as any,GITHUB_MEDIA_TOKEN:"github-test-token",GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
   const res=await worker.fetch(new Request(base+"/api/media",{method:"POST",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token,"Content-Type":"image/png"},body:new Uint8Array([1,2,3,4,5,6,7,8,9])}),env);
   expect(res.status).toBe(415);
  });
