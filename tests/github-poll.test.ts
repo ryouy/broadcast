@@ -34,6 +34,35 @@ describe("direct publishing endpoint security", () => {
   expect(await res.json()).toEqual({updated:1});
   expect(statements).toEqual([{sql:"DELETE FROM deliveries WHERE id=? AND status='pending_review'",params:["example-id"]}]);
  });
+ it("edits a pending manual post and replaces its platform deliveries atomically",async()=>{
+  const secret="test-session-secret-with-adequate-length";
+  const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
+  const eventId="17af47b2-85dc-492f-a142-9673ec447075";
+  const batched:Array<{sql:string;params:unknown[]}[]>=[];
+  const db={prepare(sql:string){return {bind(...params:unknown[]){return {sql,params,all:async()=>({results:[{id:"old-id",platform:"x",status:"pending_review",source_id:"manual-broadcast"}]})};}};},batch:async(queries:Array<{sql:string;params:unknown[]}> )=>{batched.push(queries);return queries.map(()=>({meta:{changes:1}}));}};
+  const env={DB:db,GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
+  const images=["https://raw.githubusercontent.com/ryouy/broadcast/broadcast-images/media/a.png"];
+  const req=new Request(base+"/api/posts/"+eventId,{method:"PUT",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token,"Content-Type":"application/json"},body:JSON.stringify({text:"編集した投稿",x:true,instagram:true,image_urls:images})});
+  const res=await worker.fetch(req,env);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({updated:1});
+  expect(batched).toHaveLength(1);
+  expect(batched[0]).toHaveLength(4);
+  expect(batched[0][0].sql).toContain("UPDATE events");
+  expect(batched[0][0].params).toEqual(["編集した投稿","編集した投稿",images[0],JSON.stringify(images),eventId]);
+  expect(batched[0][1].sql).toContain("DELETE FROM deliveries");
+  expect(batched[0][2].params[2]).toBe("x");
+  expect(batched[0][3].params[2]).toBe("instagram");
+ });
+ it("rejects edits if any delivery was already approved",async()=>{
+  const secret="test-session-secret-with-adequate-length";
+  const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
+  const db={prepare(sql:string){return {bind(){return {all:async()=>({results:[{id:"existing",platform:"x",status:"scheduled",source_id:"manual-broadcast"}]})};}};},batch:async()=>{throw Error("must not edit");}};
+  const env={DB:db,GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
+  const eventId="17af47b2-85dc-492f-a142-9673ec447075";
+  const req=new Request(base+"/api/posts/"+eventId,{method:"PUT",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token,"Content-Type":"application/json"},body:JSON.stringify({text:"変更",x:true,image_urls:[]})});
+  expect((await worker.fetch(req,env)).status).toBe(409);
+ });
  it("saves ordered multiple images in the post record",async()=>{
   const secret="test-session-secret-with-adequate-length";
   const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
