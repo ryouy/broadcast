@@ -14,7 +14,7 @@ const error=(message:string,status=400)=>json({error:message},status);
 const uid=()=>crypto.randomUUID();
 const httpUrl=(value:string)=>{try{const u=new URL(value);return u.protocol==="https:"&&!u.username&&!u.password&&!["localhost","127.0.0.1","::1"].includes(u.hostname)&&!u.hostname.endsWith(".local")&& !u.hostname.endsWith(".internal");}catch{return false;}};
 const safeId=(s:string)=>/^[a-zA-Z0-9_-]{1,70}$/.test(s);
-const ACCESS_HEADERS={"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"};
+const ACCESS_HEADERS={"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' blob: https://raw.githubusercontent.com https://*.githubusercontent.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"};
 async function publishX(env:Env,d:Delivery){
  if(!env.X_USER_ACCESS_TOKEN)throw Error("Missing X_USER_ACCESS_TOKEN");
  if(d.image_url)throw Error("X image upload is not enabled yet; remove image or implement media upload");
