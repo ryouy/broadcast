@@ -3,6 +3,7 @@ import { authMode, callback, login, logout, sameOrigin, session } from "./auth";
 
 interface Env {
  DB: D1Database;
+ MEDIA?: R2Bucket;
  GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; SESSION_SECRET?: string; ALLOWED_EMAILS?: string;
  X_USER_ACCESS_TOKEN?: string; INSTAGRAM_ACCESS_TOKEN?: string; INSTAGRAM_USER_ID?: string;
 }
@@ -58,11 +59,32 @@ async function admin(req:Request,env:Env,url:URL){
  if(req.method!=="GET"&&!sameOrigin(req))return error("Invalid request origin",403);
  if(req.method==="GET"&&url.pathname==="/api/status"){
   const counts=await env.DB.prepare("SELECT status,COUNT(*) AS count FROM deliveries GROUP BY status").all();
-  return json({ok:true,counts:counts.results,connections:{x:!!env.X_USER_ACCESS_TOKEN,instagram:!!(env.INSTAGRAM_ACCESS_TOKEN&&env.INSTAGRAM_USER_ID)}});
+  return json({ok:true,counts:counts.results,connections:{x:!!env.X_USER_ACCESS_TOKEN,instagram:!!(env.INSTAGRAM_ACCESS_TOKEN&&env.INSTAGRAM_USER_ID)},media_enabled:!!env.MEDIA});
  }
  if(req.method==="GET"&&url.pathname==="/api/deliveries"){
   const rows=await env.DB.prepare("SELECT d.*,e.title,e.url AS source_url,s.name AS source_name,CASE WHEN s.id='manual-broadcast' THEN 1 ELSE 0 END AS is_manual FROM deliveries d JOIN events e ON e.id=d.event_id JOIN sources s ON s.id=e.source_id ORDER BY d.created_at DESC LIMIT 100").all();
   return json(rows.results);
+ }
+ if(req.method==="POST"&&url.pathname==="/api/media"){
+  if(!env.MEDIA)return error("画像保存の準備ができていません。Cloudflare R2を有効化してください",503);
+  const len=Number(req.headers.get("content-length")||0);
+  if(len>8_000_000)return error("画像は8MB以内にしてください",413);
+  const type=(req.headers.get("content-type")||"").split(";")[0].trim().toLowerCase();
+  const extensions:Record<string,string>={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
+  if(!extensions[type])return error("JPEG・PNG・WebPの画像を選んでください",415);
+  let bytes:Uint8Array;
+  try{
+   const buffer=await req.arrayBuffer();
+   if(buffer.byteLength===0||buffer.byteLength>8_000_000)return error("画像は8MB以内にしてください",413);
+   bytes=new Uint8Array(buffer);
+  }catch{return error("画像を読み込めませんでした",400);}
+  const jpeg=bytes.length>=3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
+  const png=bytes.length>=8&&[137,80,78,71,13,10,26,10].every((b,i)=>bytes[i]===b);
+  const webp=bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==="RIFF"&&String.fromCharCode(...bytes.slice(8,12))==="WEBP";
+  if(!(type==="image/jpeg"&&jpeg||type==="image/png"&&png||type==="image/webp"&&webp))return error("画像形式が正しくありません",415);
+  const key=uid()+"."+extensions[type];
+  await env.MEDIA.put(key,bytes,{httpMetadata:{contentType:type},customMetadata:{source:"broadcast"}});
+  return json({url:"https://broadcast.ryouy.workers.dev/media/"+key,key},201);
  }
  if(req.method==="POST"&&url.pathname==="/api/posts"){
   const body:any=await req.json().catch(()=>null);
@@ -391,6 +413,14 @@ export default {
  async fetch(req:Request,env:Env):Promise<Response>{
   const url=new URL(req.url);
   try{
+   if(req.method==="GET"&&url.pathname.startsWith("/media/")){
+    const key=url.pathname.slice("/media/".length);
+    if(!/^[a-f0-9-]{36}\\.(jpg|png|webp)$/.test(key))return error("Not found",404);
+    if(!env.MEDIA)return error("Not found",404);
+    const object=await env.MEDIA.get(key);
+    if(!object)return error("Not found",404);
+    return new Response(object.body,{headers:{"content-type":object.httpMetadata?.contentType||"application/octet-stream","cache-control":"public,max-age=31536000,immutable","x-content-type-options":"nosniff","content-disposition":"inline","access-control-allow-origin":"*"}});
+   }
    if(req.method==="GET"&&url.pathname==="/favicon.svg")return new Response(FAVICON_SVG,{headers:{"content-type":"image/svg+xml; charset=utf-8","cache-control":"public,max-age=86400","x-content-type-options":"nosniff"}});
    if(req.method==="GET"&&url.pathname==="/")return new Response(page,{headers:ACCESS_HEADERS});
    if(req.method==="GET"&&url.pathname==="/api/auth/config")return json({mode:authMode(env)});
