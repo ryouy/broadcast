@@ -8,7 +8,7 @@ export default defineConfig({
     entrypoint,
     env: {
       DB: bindings.d1({ name: "broadcast-db" }),
-      MEDIA: bindings.r2({ name: "broadcast-media" }),
+      GITHUB_MEDIA_TOKEN: bindings.secret(),
       GOOGLE_CLIENT_ID: bindings.secret(),
       GOOGLE_CLIENT_SECRET: bindings.secret(),
       SESSION_SECRET: bindings.secret(),
