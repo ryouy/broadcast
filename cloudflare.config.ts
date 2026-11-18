@@ -8,7 +8,6 @@ export default defineConfig({
     entrypoint,
     env: {
       DB: bindings.d1({ name: "broadcast-db" }),
-      ADMIN_TOKEN: bindings.secret(),
       GOOGLE_CLIENT_ID: bindings.secret(),
       GOOGLE_CLIENT_SECRET: bindings.secret(),
       SESSION_SECRET: bindings.secret(),
