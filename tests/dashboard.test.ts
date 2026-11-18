@@ -9,7 +9,12 @@ describe("dashboard", () => {
   expect(source).toContain("管理画面");
   expect(source).not.toContain("発信するものを、ひとつの場所で。");
   expect(source).not.toContain("PERSONAL WORKSPACE");
-  expect(source).toContain("Publishing queue");
+  expect(source).toContain("投稿キュー");
+  expect(source).not.toContain("GitHub・RSSの更新と投稿を管理");
+  expect(source).not.toContain("Worker online");
+  expect(source).toContain('href="/favicon.svg"');
+  expect(source).toContain('url.pathname==="/favicon.svg"');
+  expect(source).toContain("<h2>監視ソース</h2>");
   expect(source).not.toContain('id="login-form"');
   expect(source).not.toContain('ADMIN_TOKEN');
   expect(source).not.toContain('if(!token)return');
