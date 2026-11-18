@@ -296,10 +296,9 @@ const page=`<!doctype html>
     <a href="#sources-section"><span>監視ソース</span></a>
     <a href="#queue-section"><span>投稿キュー</span></a>
   </nav>
-  <div class="side-bottom"></div>
 </aside>
 <main class="content" id="overview">
-  <div class="top"><div class="top-actions"><button class="secondary" id="logout" style="display:none">ログアウト</button><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
+  <div class="top"><div class="top-actions"><button class="secondary" id="logout" style="display:none">ログアウト</button><button class="secondary" id="refresh" type="button">再読み込み</button></div></div>
   <div class="heading"><div><h1 id="page-title">概要</h1></div><button class="secondary" id="check-now">更新を確認</button></div>
   <p id="notice" role="status" aria-live="polite"></p>
   <div class="stats">
