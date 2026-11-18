@@ -18,6 +18,11 @@ describe("dashboard", () => {
   expect(source).not.toContain('id="stat-published"');
   expect(source).toContain('id="post-file"');
   expect(source).toContain('id="image-preview"');
+  expect(source).toContain('id="image-dialog"');
+  expect(source).toContain('multiple aria-describedby="upload-help"');
+  expect(source).toContain('function showImage(urls,index)');
+  expect(source).toContain('function addImages(files)');
+  expect(source).toContain('const groups=new Map()');
   expect(source).toContain('url.pathname==="/api/media"');
   expect(source).toContain('media_enabled:!!env.GITHUB_MEDIA_TOKEN');
   expect(source).not.toContain("GitHub・RSSの更新と投稿を管理");
