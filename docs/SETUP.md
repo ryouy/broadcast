@@ -55,3 +55,17 @@ cf deploy
 ```
 
 GitHub Actionsはテスト・疎通確認用です。GitHubへのコミットは自動的にCloudflareへデプロイされません。
+
+
+## 画像ファイルの直接アップロード
+
+R2有効化後に以下を設定します。
+
+1. Cloudflareの **R2 Object Storage** を有効化（現時点ではAPIがエラー10042「R2を有効化してください」を返しています）。
+2. バケット **`broadcast-media`** を作成。
+3. Workers & Pages → `broadcast` → Settings → Bindingsで、R2 bucketバインディング **`MEDIA`** を `broadcast-media` に接続。
+4. Workerを再デプロイして、管理画面の画像選択が有効になることを確認。
+
+リポジトリの `cloudflare.config.ts` には `MEDIA: bindings.r2({ name: "broadcast-media" })` が記載済みです。R2は非公開バケットとして構成し、画像はWorkerの `/media/...` 経由で配信します（Instagramが取得するため画像URL自体は公開）。バケット全体をパブリック公開する必要はありません。
+
+アップロードAPIは8MB以内のJPEG/PNG/WebPのみ受け付け、Google認証・同一オリジンを必須とします。ユーザーが投稿の保存・承認前にアップロードしたファイルもR2上に残るため、不要画像の定期削除は運用上の追加課題です。
