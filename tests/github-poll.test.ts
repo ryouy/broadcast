@@ -35,7 +35,7 @@ describe("direct publishing endpoint security", () => {
   expect(res.status).toBe(201);
   const event=writes.find(x=>x.sql.startsWith("INSERT INTO events"));
   expect(event?.sql).toContain("image_urls");
-  expect(event?.params[5]).toBe(JSON.stringify(images));
+  expect(event?.params[6]).toBe(JSON.stringify(images));
   expect(writes.filter(x=>x.sql.startsWith("INSERT INTO deliveries"))).toHaveLength(1);
  });
  it("rejects more than four images on a post",async()=>{
