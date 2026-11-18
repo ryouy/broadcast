@@ -1,42 +1,38 @@
 # Broadcast
 
-GitHub Releases と RSS/Atom の新着を検知して、X と Instagram に投稿する個人用の Cloudflare Workers アプリです。
+Broadcastは、管理画面でお知らせを作り、XとInstagramへの投稿を管理する個人用アプリです。
 
-**現在: 初期MVP（検証環境デプロイ済み）。投稿はすべて承認待ちから始まり、無断で自動公開しません。**
+**管理画面:** https://broadcast.ryouy.workers.dev/
 
-**ステージングURL:** https://broadcast.ryouy.workers.dev/
+## 使い方
+1. 許可されたGoogleアカウントでログインする。
+2. 「投稿を作成」で本文と投稿先（X / Instagram）を選ぶ。Instagramには公開HTTPS画像URLが必要。
+3. 「確認待ちに保存」する。**保存だけではSNSへ投稿されません。**
+4. 「投稿一覧」で内容を確認し、問題なければ「投稿を承認」する。
+5. 承認した投稿はCloudflare Cronから送信される（現状は最大約15分の待ち時間）。
 
-Cloudflare WorkerとD1 `broadcast-db` は作成済みです。Google OAuthへ完全移行し、許可メールアドレスだけが管理画面にログインできます。旧管理トークン認証は廃止しました。`ryouy/broadcast` は監視対象としてD1に登録済みで、v0.1.0 Releaseの初回表示確認用データを承認待ちで登録しています（初回は手動登録）。v0.1.1は2026-11-18にCron監視で自動検知し、X用の承認待ち投稿キューへ一件登録できたことをD1で確認しました。検証後Cronは15分間隔に戻しています。Cloudflare Cronは15分ごとに動作し、`ryouy/broadcast` を監視します。
+## 機能
+- Google OAuthによる管理者認証、許可メールアドレス制限
+- 投稿文の作成、投稿先の選択、確認待ち保存、承認・見送り
+- SNS別の送信状態・投稿履歴管理
+- SNSの認証情報が未設定なら投稿承認を拒否
+- 送信結果が曖昧な場合は自動再送せず、二重投稿を防止
 
-## できること
-- GitHub Webhook の署名検証とリリース検知
-- GitHub Releases APIの15分間隔監視（Webhookなしでも利用可能）
-- RSS/Atom 新着検知（15分間隔・初回過去記事スキップ）
-- D1を使ったソース・イベント・SNS別投稿キュー
-- Google OAuth・許可メールアドレス制限・署名付きCookieによる管理者認証（旧トークン認証は廃止）
-- Xテキスト投稿とInstagram画像投稿のAPI実装
-- 送信不明時に再送を止める重複投稿配慮
+**GitHub Releases / RSS / Atomの自動監視とWebhookの受信は廃止しました。**
+過去に検証で取り込んだイベント・投稿履歴は、既存のD1データを削除せず残しています。
+
+## SNS連携の現状
+X・Instagramの認証情報は別途設定が必要です。連携前でも文章を作って確認待ちに保存できます。Instagramは公開画像URLが必要で、画像の直接アップロードは未対応です。Xへの画像添付も未実装です。
 
 ## 技術
-TypeScript / Cloudflare Workers / D1 / Cron Triggers / Cloudflare CLI (`cf`) / Vitest
+TypeScript / Cloudflare Workers / D1 / Cron Triggers / Vitest
 
 ## 開発
 ```bash
 npm install
 npm run check
 npm test
-npm run dev
+npm run build
 ```
 
-CloudflareのWorker・D1作成、マイグレーション、Cron、初回デプロイは完了しています。Google OAuthのClient ID/Secret・許可メールアドレス設定、ログインの確認が完了しています。SNS用Secret設定とWebhook登録、実投稿の検証は未実施です。
-
-**設定方法・未対応事項: [docs/SETUP.md](docs/SETUP.md)**
-
-## 安全な初期状態
-- 監視ソースは登録済み（新規環境ではゼロ）
-- 全投稿は `pending_review`
-- 認証設定が無効／不完全な場合は管理APIを拒否
-- SNSトークン未設定時は投稿できない
-- 不確実な送信結果は自動リトライしない
-
-License: Not specified.
+詳しくは [docs/SETUP.md](docs/SETUP.md) を参照してください。
