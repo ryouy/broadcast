@@ -1,99 +1,57 @@
-# Broadcast — セットアップ
+# Broadcast セットアップ
 
-## 現在の機能
-- GitHub `release.published` を署名検証して受信し、登録したリポジトリのイベントのみD1に保存
-- GitHub Releases APIの定期監視（Webhook権限がなくても動作）
-- RSS/Atomを15分間隔で確認。最初の読み込みでは過去記事を投稿しない
-- X / Instagram 向けの投稿を独立したキューに登録
-- Google OAuth（OpenID Connect）の許可メールアドレスだけが管理画面にログインできる。旧管理トークン認証は廃止
-- 承認したジョブのみCronから投稿を試行。初期状態は公開しない
-- 送信結果が不明なら `unknown` に留め、自動再送を避ける
+## 概要
+Broadcastは管理画面から文章を作成し、XとInstagramへの投稿候補を保存・承認するアプリです。GitHub Releases/RSS/Atomの監視は行いません。
 
-## 現在のCloudflare環境（2026-11-17）
-- Worker: `broadcast`
-- URL: https://broadcast.ryouy.workers.dev/
-- D1: `broadcast-db`（初期SQL適用済み）
-- Cron: `*/15 * * * *`（UTC、15分ごと）。監視検証時のみ一時的に毎分実行へ変更し、確認後に元へ復旧済み。
-- GitHub Releases APIの定期監視と、Google OAuth移行用の認証コードを実装済み。現在はGoogleログイン専用です。認証情報が欠けている場合、管理APIは503を返します。
-- `ryouy/broadcast` は監視ソースとして登録済み。v0.1.0は初回画面確認用に手動登録。v0.1.1（GitHub Release ID 449547826）は2026-11-18 05:06:15 UTCに公開、同日05:17:05 UTCにCronによるポーリングでD1へ自動検知・登録されたことを確認済み。X用投稿キューは `pending_review` のまま。
-- Google OAuthクライアントの設定、許可メールリストの登録、Googleアカウントでのログイン確認は完了。旧`ADMIN_TOKEN`は廃止。
-- SNS認証情報は未設定です。検証中は承認ボタンを押さないでください。
-- **注意:** GitHub Actionsはビルド・疎通のCIのみで、自動デプロイはまだ構成していません。GitHubへの追加コミットが自動で公開URLへ反映されるわけではありません。
+管理画面: https://broadcast.ryouy.workers.dev/
 
-## 事前準備
-Node.js 22.18以降とCloudflare CLI (`cf`) を使用。Cloudflare、X Developer、Meta Developerのアカウントが必要。
+## 認証
+Google OAuthのサーバーサイドAuthorization Code + PKCEで管理者ログインします。
+Cloudflare Workerに以下の変数を登録します。
 
+| 変数 | 内容 |
+| --- | --- |
+| `GOOGLE_CLIENT_ID` | Google OAuth WebクライアントID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuthクライアントシークレット |
+| `SESSION_SECRET` | Cookie署名用ランダム文字列 |
+| `ALLOWED_EMAILS` | ログイン許可メールアドレス（カンマ区切り） |
+
+Google Cloud Consoleに登録するリダイレクトURLは
+`https://broadcast.ryouy.workers.dev/auth/callback` です。
+認証情報が未設定の場合は管理APIを拒否します。
+
+## 投稿手順
+1. 管理画面で「投稿を作成」を開く。
+2. 本文、画像URL（必要な場合）、X / Instagramの投稿先を指定する。
+3. 「確認待ちに保存」を押す。保存だけで外部SNSへ投稿することはありません。
+4. 「投稿一覧」で投稿内容を確認し「投稿を承認」すると送信予定になる。
+5. Cloudflare Cron（`*/15 * * * *`）で送信予定分を処理する。
+
+Xは文章280文字以内、Instagramは2200文字以内かつ公開HTTPS画像URLが必要です（現在の入力検証）。
+Xへの画像アップロード、画像ファイルの直接アップロードは未実装です。
+
+## SNS連携に必要な変数
+| 変数 | 内容 |
+| --- | --- |
+| `X_USER_ACCESS_TOKEN` | Xの投稿権限のあるUser Access Token |
+| `INSTAGRAM_ACCESS_TOKEN` | Instagram Content Publishing権限のあるトークン |
+| `INSTAGRAM_USER_ID` | InstagramアカウントID |
+
+未登録のSNSへの投稿承認はAPIで拒否します。未連携でも文章の保存・確認は可能です。
+曖昧な送信失敗は`unknown`となり、自動的には再送しません。
+
+## 保存データ
+D1 `broadcast-db` の既存の`sources`、`events`、`deliveries`テーブルを利用し、手動投稿は無効化された内部ソース`manual-broadcast`に関連付けて保存します。
+この内部ソースは外部フィードの取得には使用されません。既存の過去データは削除していません。
+過去の`migrations/0001_init.sql`・`0002_monitoring.sql`は既存DBとの互換性のため残しています。
+
+## 開発とデプロイ
 ```bash
 npm install
 npm run check
 npm test
-cf auth login
-```
-
-### D1
-`cloudflare.config.ts` に `bindings.d1({ name: "broadcast-db" })` を定義。
-初期環境は作成・初期SQL適用済みです。新しい環境を作成する場合はCloudflare CLIでD1を作成し、`migrations/0001_init.sql` を適用してください（詳細コマンドはインストールした `cf` の `cf --help` / `cf cli search "d1 migrations"` で確認）。本番にマイグレーションを適用するまでAPIは動作しません。
-
-### Secrets
-Cloudflare Workers側に次のSecretを設定。値をGitHubへコミットしないこと。
-
-| 変数 | 必須 | 内容 |
-| --- | --- | --- |
-| `GOOGLE_CLIENT_ID` | Google認証時 | OAuth 2.0 ウェブアプリのClient ID |
-| `GOOGLE_CLIENT_SECRET` | Google認証時 | OAuth 2.0 ウェブアプリのClient Secret |
-| `SESSION_SECRET` | Google認証時 | Cookie署名用のランダム文字列。 `openssl rand -base64 48` 等で生成 |
-| `ALLOWED_EMAILS` | Google認証時 | 管理画面へのログインを許すメールアドレスをカンマ区切りで指定 |
-| `GITHUB_WEBHOOK_SECRET` | GitHub利用時 | GitHub webhookの共通署名鍵 |
-| `X_USER_ACCESS_TOKEN` | X投稿時 | user contextのWrite権限を持つOAuth2アクセストークン |
-| `INSTAGRAM_ACCESS_TOKEN` | IG投稿時 | Instagram LoginのContent Publishing権限を持つトークン |
-| `INSTAGRAM_USER_ID` | IG投稿時 | 対象InstagramプロアカウントのID |
-
-### Google OAuth 設定（Cloudflare Zero Trustは不要）
-
-1. [Google Cloud Console](https://console.cloud.google.com/auth/overview) でプロジェクトを作成・選択し、Google Auth Platformのブランディングおよび対象ユーザーを設定します。個人用途でアプリを「テスト中」にする場合、**テストユーザー**にも自分のGoogleアカウントを追加してください。
-2. **Clients → Create client → Web application** からOAuth 2.0 クライアントを作成します。
-3. 承認済みのリダイレクトURI（完全一致）に `https://broadcast.ryouy.workers.dev/auth/callback` を追加します。JavaScriptオリジンは `https://broadcast.ryouy.workers.dev` を指定できます（サーバーサイド認可コード処理自体には必須ではありません）。
-4. Cloudflare Dashboard → Workers & Pages → `broadcast` → Settings → Variables and Secrets で、`GOOGLE_CLIENT_ID`・`GOOGLE_CLIENT_SECRET`・`SESSION_SECRET`・`ALLOWED_EMAILS` の**4件すべて**を設定します。Secretや許可リストをGitHubに記載しないでください。
-5. 公開画面でGoogleログインが表示され、許可メールアドレスだけがログインできることを確認します。未許可アカウントでも拒否されること、ログアウト後にAPIが401になることを確認してください。
-6. 旧`ADMIN_TOKEN`は不要です。
-
-**認証仕様:** 4件の設定がすべて揃わない場合、管理APIを503で拒否します。Google OAuth以外の管理ログイン方法はありません。管理APIのPOSTは同一Originのみ許可します。セッションはHttpOnly・Secure・SameSite=Laxの署名付きCookieで8時間有効。OAuthではstate・nonce・PKCE・Google署名のIDトークン・audience・発行者・メール確認を検証します。
-
-Webhookは `/webhooks/github` に従来どおり署名を要求し、Googleログイン不要で受信できます。
-
-### GitHub Webhook
-監視したいGitHubリポジトリの `Settings > Webhooks` で以下を指定。
-
-- Payload URL: `https://<worker-host>/webhooks/github`
-- Content type: `application/json`
-- Secret: `GITHUB_WEBHOOK_SECRET` と同じ値
-- Events: `Releases` のみ
-
-管理画面で同じ `https://github.com/owner/repo` をソース登録します。Webhookを設定できない場合もReleases APIを15分ごとにポーリングします。`ryouy/broadcast` は登録済みです。
-
-### 監視状況の診断
-
-`migrations/0002_monitoring.sql` を適用済み。ソースごとに `last_checked_at` / `last_check_error`、Cron全体には `monitoring_state.last_cron_at` / `last_cron_error` を記録します。監視に失敗したソースは管理画面のSourcesにもエラー内容が表示されます。診断機能は検証後に追加したため、最初の成功時刻（05:17 UTC）は `events.detected_at` で確認しています。
-
-### RSS
-管理画面にRSS/AtomのHTTPS URLを追加。最初の取得は基準点の登録だけで過去記事を一括投稿しません。以後の新着をキューへ登録します。
-
-### 公開
-すべての投稿は `pending_review` で生成。管理画面で承認すると `scheduled` になり、Cronで投稿されます。キーがまだなければ `unknown` になり公開されません。
-
-### 制限と今後の課題
-- **X画像アップロードは未実装**。画像が付くXジョブは安全にエラー扱いします。
-- **Instagram** は外部からアクセスできるHTTPS画像URLが必須です。コンテナ処理が未完了の場合は要確認になります。
-- 送信エラーは `unknown` になり自動リトライしません。これは二重投稿防止を優先した暫定設計です。
-- RSS HTTP fetchにはサイズ制限を設けていますが、公開RSSの取得にはDNSリバインディングなどに備えた追加のSSRF対策が必要です。信頼できるRSS URLだけ登録してください。
-- GitHub Push/PR、画像生成、ジョブ編集、統計、日次件数・API費用の強制上限、メディア用R2、トークン自動更新は未実装です。
-- 一般公開・課金運用は行わず、まずは個人の検証環境で利用してください。
-
-## デプロイ
-```bash
-npm install
-npm run check
-npm test
-cf deploy --dry-run
+npm run build
 cf deploy
 ```
+
+GitHub Actionsはテスト・疎通確認用です。GitHubへのコミットは自動的にCloudflareへデプロイされません。
