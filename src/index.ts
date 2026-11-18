@@ -438,7 +438,12 @@ export default {
  async fetch(req:Request,env:Env):Promise<Response>{
   const url=new URL(req.url);
   try{
-   if(req.method==="GET"&&url.pathname==="/")return new Response(env.ADMIN_TOKEN?page:page.replace("トークンを入力して「読み込む」を押してください。","現在CloudflareにADMIN_TOKENが登録されていません。Workers & Pages の broadcast → Settings → Variables and Secrets に Secret を追加してください。"),{headers:ACCESS_HEADERS});
+   if(req.method==="GET"&&url.pathname==="/")return new Response(page,{headers:ACCESS_HEADERS});
+   if(req.method==="GET"&&url.pathname==="/api/auth/config")return json({mode:authMode(env)});
+   if(req.method==="GET"&&url.pathname==="/api/auth/session"){const user=await session(req,env);return user?json({authenticated:true,email:user.email}):error("Unauthorized",401);}
+   if(req.method==="GET"&&url.pathname==="/auth/google")return login(req,env);
+   if(req.method==="GET"&&url.pathname==="/auth/callback")return callback(req,env);
+   if(req.method==="POST"&&url.pathname==="/auth/logout"){if(!sameOrigin(req))return error("Invalid request origin",403);return logout();}
    if(req.method==="POST"&&url.pathname==="/webhooks/github")return webhook(req,env);
    if(url.pathname.startsWith("/api/"))return admin(req,env,url);
    return error("Not found",404);
