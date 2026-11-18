@@ -284,6 +284,13 @@ textarea:focus,.text-input:focus{border-color:#555}
 .image-dialog-controls .secondary{font-size:14px}
 @media(max-width:650px){.delivery{padding:14px 12px}.record-title{font-size:16px}.delivery-gallery{grid-template-columns:repeat(auto-fill,minmax(90px,1fr))}.gallery-image img{height:105px}.file-choose span{width:100%}}
 
+.post-body{font-size:16px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 3px;min-width:0}
+.post-body-clamped{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
+.post-body-expanded{display:block;overflow:visible;-webkit-line-clamp:unset;line-clamp:unset}
+.post-expand{background:none;border:0;padding:5px 0;margin:2px 0 6px;color:#555;text-decoration:underline;text-underline-offset:3px;font-size:14px}
+.post-expand:hover{color:#111}
+.record:empty{display:none}
+@media(max-width:650px){.post-body{font-size:15px}}
 /* Focused, compact editor */
 .main{max-width:1100px;padding-top:26px}
 #compose .form-area{max-width:680px;margin:0 auto}
@@ -451,12 +458,27 @@ function renderQueue(items){
  if(!posts.length){box.append(el("div","empty","まだ投稿はありません"));return;}
  for(const entries of posts.slice(queuePage*size,queuePage*size+size)){
   const item=entries[0],row=el("article","delivery"),top=el("div","delivery-top"),record=el("div","record");
-  record.append(el("div","record-title",item.is_manual?item.text:item.title));
+  // Keep long text readable without making every card taller than the screen.
+  if(!item.is_manual)record.append(el("div","record-title",item.title));
   top.append(record);
   row.append(top);
-  if(!item.is_manual){
-   if(item.text)row.append(el("p","delivery-copy",item.text));
-   if(item.source_url){const link=el("a","record-sub",item.source_name||"元のページ");link.href=item.source_url;link.target="_blank";link.rel="noopener noreferrer";row.append(link);}
+  const fullText=String(item.text||"");
+  const body=el("p","post-body post-body-clamped",fullText);
+  row.append(body);
+  const needsToggle=fullText.length>100||fullText.split("\\n").length>3;
+  if(needsToggle){
+   const toggle=el("button","post-expand","全文を表示");
+   toggle.type="button";
+   toggle.setAttribute("aria-expanded","false");
+   toggle.addEventListener("click",()=>{
+    const expanded=body.classList.toggle("post-body-expanded");
+    toggle.textContent=expanded?"閉じる":"全文を表示";
+    toggle.setAttribute("aria-expanded",String(expanded));
+   });
+   row.append(toggle);
+  }
+  if(!item.is_manual&&item.source_url){
+   const link=el("a","record-sub",item.source_name||"元のページ");link.href=item.source_url;link.target="_blank";link.rel="noopener noreferrer";row.append(link);
   }
   const images=getImages(item);
   if(images.length){
