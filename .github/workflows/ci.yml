@@ -22,8 +22,8 @@ jobs:
           echo "auth_config=$(curl --silent --show-error --max-time 12 https://broadcast.ryouy.workers.dev/api/auth/config)"
       - name: Verify deployed Japanese UI and favicon
         run: |
-          curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q "投稿キュー"
-          curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q "監視ソース"
+          curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q "投稿の確認"
+          curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/ | grep -q "更新元の設定"
           curl --fail --silent --show-error https://broadcast.ryouy.workers.dev/favicon.svg | grep -q "<svg"
       - name: Verify public Google auth configuration
         run: |
