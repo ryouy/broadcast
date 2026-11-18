@@ -171,13 +171,15 @@ async function admin(req:Request,env:Env,url:URL){
  }
  return error("Not found",404);
 }
+const FAVICON_SVG='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="13" fill="#262626"/><path d="M19 14h19c9 0 14 6 14 12 0 6-3 10-9 12 7 1 11 5 11 12 0 9-7 14-17 14H19V14zm11 9v12h8c5 0 7-2 7-6s-3-6-8-6h-7zm0 20v12h8c6 0 9-2 9-6s-3-6-9-6h-8z" transform="translate(0 -7)" fill="#fff"/></svg>';
 const page=`<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f8f8f6">
-<title>Broadcast — Dashboard</title>
+<title>Broadcast | 管理画面</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 :root{color-scheme:light;--bg:#f8f8f6;--paper:#fff;--ink:#202320;--muted:#858883;--line:#e8e9e5;--soft:#f2f3f0;--accent:#2f5144;--error:#a13d36}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline}
@@ -266,22 +268,39 @@ const page=`<!doctype html>
  .delivery{padding:8px 12px}
  .footer{margin-top:8px}
 }
+
+/* Simplified Japanese administration layout */
+:root{--bg:#f7f7f7;--paper:#fff;--ink:#222;--muted:#777;--line:#e7e7e7;--accent:#333}
+.brand{padding:0 10px;letter-spacing:-.35px;font-weight:650;font-size:18px;gap:0}
+.nav a{color:#555;border-radius:7px;font-weight:500}
+.nav a.active{background:#ececec;color:#222}
+.top{justify-content:flex-end}
+.heading h1{font-weight:620;letter-spacing:-.7px}
+.panel,.stat{border-radius:9px}
+.stat{box-shadow:none}
+.primary{border-radius:7px}
+.secondary,.icon-button{border-radius:7px}
+.pill{border-radius:5px}
+.source-icon{font-size:11px;font-weight:650;color:#666;border-radius:6px}
+.platform{font-size:11px}
+.login{border-radius:12px;box-shadow:0 10px 30px #00000008}
+@media(max-width:620px){.nav a span{display:inline}.nav a{font-size:11px;padding:8px 5px}.sidebar{padding:14px 12px}.brand{font-size:16px}}
 </style>
 </head>
 <body>
 <div class="shell">
 <aside class="sidebar">
-  <a href="#overview" class="brand"><span class="brand-icon">↗</span>broadcast</a>
+  <a href="#overview" class="brand">Broadcast</a>
   <nav class="nav" aria-label="セクション">
-    <a class="active" href="#overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg><span>Overview</span></a>
-    <a href="#sources-section"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4.9 4.9a10 10 0 0 1 14.2 14.2M2 9a13 13 0 0 1 13 13"/></svg><span>Sources</span></a>
-    <a href="#queue-section"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg><span>Queue</span></a>
+    <a class="active" href="#overview"><span>概要</span></a>
+    <a href="#sources-section"><span>監視ソース</span></a>
+    <a href="#queue-section"><span>投稿キュー</span></a>
   </nav>
   <div class="side-bottom"></div>
 </aside>
 <main class="content" id="overview">
-  <div class="top"><div class="crumb"><span id="crumb-current">Overview</span></div><div class="top-actions"><span class="online"><span class="dot"></span> Worker online</span><button class="secondary" id="logout" style="display:none">ログアウト</button><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
-  <div class="heading"><div><h1 id="page-title">Overview</h1><p class="sub">GitHub・RSSの更新と投稿を管理</p></div><button class="secondary" id="check-now">更新を確認</button></div>
+  <div class="top"><div class="top-actions"><button class="secondary" id="logout" style="display:none">ログアウト</button><button class="icon-button" id="refresh" title="更新" aria-label="最新情報を読み込む"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9A7.5 7.5 0 0 1 19 7l1 5M4 12l1 5a7.5 7.5 0 0 0 13.4-2"/></svg></button></div></div>
+  <div class="heading"><div><h1 id="page-title">概要</h1></div><button class="secondary" id="check-now">更新を確認</button></div>
   <p id="notice" role="status" aria-live="polite"></p>
   <div class="stats">
     <div class="stat"><div class="stat-label">監視ソース</div><strong id="stat-sources">—</strong></div>
@@ -289,24 +308,24 @@ const page=`<!doctype html>
     <div class="stat"><div class="stat-label">公開済み</div><strong id="stat-published">—</strong></div>
   </div>
   <div class="workspace-panels">
-  <section class="section" id="sources-section"><div class="section-head"><h2>Sources</h2><span class="section-meta" id="source-count">0 sources</span></div><div class="panel" id="sources"><div class="empty">認証後に表示します。</div></div><div class="paging" id="sources-paging"></div></section>
-  <section class="section" id="queue-section"><div class="section-head"><h2>Publishing queue</h2><span class="section-meta" id="queue-count">0 posts</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div><div class="paging" id="queue-paging"></div></section>
-  <section class="section" id="add-section"><div class="section-head"><h2>Add source</h2><span class="section-meta">GitHub / RSS</span></div>
+  <section class="section" id="sources-section"><div class="section-head"><h2>監視ソース</h2><span class="section-meta" id="source-count">0 sources</span></div><div class="panel" id="sources"><div class="empty">認証後に表示します。</div></div><div class="paging" id="sources-paging"></div></section>
+  <section class="section" id="queue-section"><div class="section-head"><h2>投稿キュー</h2><span class="section-meta" id="queue-count">0 posts</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div><div class="paging" id="queue-paging"></div></section>
+  <section class="section" id="add-section"><div class="section-head"><h2>ソースを追加</h2></div>
     <div class="panel"><form class="settings" id="newSource">
-      <div class="field"><label for="kind">種類</label><select id="kind"><option value="github">GitHub Releases</option><option value="rss">RSS / Atom</option></select></div>
-      <div class="field"><label for="name">表示名</label><input id="name" type="text" required maxlength="100" placeholder="My project"></div>
+      <div class="field"><label for="kind">種類</label><select id="kind"><option value="github">GitHub リリース</option><option value="rss">RSS / Atom</option></select></div>
+      <div class="field"><label for="name">表示名</label><input id="name" type="text" required maxlength="100" placeholder="ソース名"></div>
       <div class="field full"><label for="url">URL</label><input id="url" type="url" required placeholder="https://github.com/owner/repo"></div>
       <div class="field full"><label for="image">Instagram用画像URL（任意）</label><input id="image" type="url" placeholder="https://example.com/cover.jpg"></div>
       <div class="form-bottom"><div class="checks"><label><input id="x" type="checkbox" checked>X</label><label><input id="ig" type="checkbox">Instagram</label></div><button type="submit" class="primary" id="add">ソースを追加</button></div>
     </form></div>
   </section>
   </div>
-  <div class="footer"><span>Broadcast</span><span></span></div>
+  
 </main>
 </div>
 <div class="lock" id="lock"><div class="login">
-  <div class="brand"><span class="brand-icon">↗</span>broadcast</div>
-  <h2>管理画面</h2><p>管理トークンを入力してください。</p>
+  <div class="brand">Broadcast</div>
+  <h2>管理画面</h2>
   <button class="primary" id="google-login" type="button" style="display:none">Googleでログイン</button>
 
   <p id="login-message" role="alert"></p>
@@ -319,7 +338,7 @@ let isAuthenticated=false;
 let allSources=[],allDeliveries=[],sourcePage=0,queuePage=0;
 const desktop=()=>window.matchMedia("(min-width:901px)").matches;
 const view=()=>document.body.dataset.view||"overview";
-function setView(v){if(!["overview","sources","queue"].includes(v))v="overview";document.body.dataset.view=v;const title=({overview:"Overview",sources:"Sources",queue:"Publishing queue"})[v];$("page-title").textContent=title;$("crumb-current").textContent=title;document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active",a.getAttribute("href")===(v==="overview"?"#overview":v==="sources"?"#sources-section":"#queue-section")));renderSources(allSources);renderQueue(allDeliveries);}
+function setView(v){if(!["overview","sources","queue"].includes(v))v="overview";document.body.dataset.view=v;const title=({overview:"概要",sources:"監視ソース",queue:"投稿キュー"})[v];$("page-title").textContent=title;document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active",a.getAttribute("href")===(v==="overview"?"#overview":v==="sources"?"#sources-section":"#queue-section")));renderSources(allSources);renderQueue(allDeliveries);}
 function pageControls(id,total,page,size,onClick){const p=$(id);p.replaceChildren();if(!desktop()||total<=size)return;const count=Math.ceil(total/size);p.append(el("span",null,(page+1)+" / "+count));for(const [label,n] of [["前へ",page-1],["次へ",page+1]]){const b=el("button",null,label);b.type="button";b.disabled=n<0||n>=count;b.addEventListener("click",()=>onClick(n));p.append(b);}}
 
 const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=String(txt);return e;};
@@ -335,22 +354,22 @@ function statusClass(s){return s==="pending_review"?"awaiting":s==="unknown"||s=
 function shorten(s,max=75){s=String(s||"");return s.length>max?s.slice(0,max)+"…":s;}
 function renderSources(sources){
  $("stat-sources").textContent=sources.length;
- $("source-count").textContent=sources.length+" sources";
+ $("source-count").textContent=sources.length+"件";
  allSources=sources;const panel=$("sources");panel.replaceChildren();
  const size=desktop()?4:Infinity;if(sourcePage*size>=sources.length)sourcePage=0;
  pageControls("sources-paging",sources.length,sourcePage,size,n=>{sourcePage=n;renderSources(allSources);});
  if(!sources.length){const empty=el("div","empty");empty.append(el("strong",null,"監視ソースはありません"),el("span",null,""));panel.append(empty);return;}
  for(const s of sources.slice(sourcePage*size,sourcePage*size+size)){
-   const row=el("div","list-row");const ico=el("div","source-icon",s.type==="github"?"⌘":"↗");
+   const row=el("div","list-row");const ico=el("div","source-icon",s.type==="github"?"Git":"RSS");
    const rec=el("div","record");rec.append(el("div","record-title",s.name));
    const sub=el("div","record-sub");const a=el("a",null,s.url);a.href=s.url;a.target="_blank";a.rel="noopener noreferrer";sub.append(a);rec.append(sub);
-   const end=el("div","end");end.append(el("span","pill "+(s.last_check_error?"failed":""),s.last_check_error?"Error":s.enabled?"Active":"Paused"));
+   const end=el("div","end");end.append(el("span","pill "+(s.last_check_error?"failed":""),s.last_check_error?"取得エラー":s.enabled?"監視中":"停止中"));
    if(s.last_check_error)rec.append(el("div","record-sub error-note",s.last_check_error));
    row.append(ico,rec,end);panel.append(row);
  }
 }
 function renderQueue(items){
- $("queue-count").textContent=items.length+" posts";
+ $("queue-count").textContent=items.length+"件";
  $("stat-pending").textContent=items.filter(x=>x.status==="pending_review").length;
  $("stat-published").textContent=items.filter(x=>x.status==="published").length;
  allDeliveries=items;const panel=$("deliveries");panel.replaceChildren();
@@ -359,7 +378,7 @@ function renderQueue(items){
  if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"投稿はありません"),el("span",null,""));panel.append(empty);return;}
  for(const d of items.slice(queuePage*size,queuePage*size+size)){
   const item=el("div","delivery");const top=el("div","delivery-top");
-  const platform=el("div","platform",d.platform==="x"?"𝕏":"◎");platform.title=d.platform;
+  const platform=el("div","platform",d.platform==="x"?"X":"IG");platform.title=d.platform;
   const rec=el("div","record");rec.append(el("div","record-title",d.title));
   const sub=el("div","record-sub");const a=el("a",null,d.source_name||"ソースを開く");a.href=d.source_url;a.target="_blank";a.rel="noopener noreferrer";sub.append(a);rec.append(sub);
   const end=el("div","end");end.append(el("span","pill "+statusClass(d.status),statusName(d.status)));
@@ -434,6 +453,7 @@ export default {
  async fetch(req:Request,env:Env):Promise<Response>{
   const url=new URL(req.url);
   try{
+   if(req.method==="GET"&&url.pathname==="/favicon.svg")return new Response(FAVICON_SVG,{headers:{"content-type":"image/svg+xml; charset=utf-8","cache-control":"public,max-age=86400","x-content-type-options":"nosniff"}});
    if(req.method==="GET"&&url.pathname==="/")return new Response(page,{headers:ACCESS_HEADERS});
    if(req.method==="GET"&&url.pathname==="/api/auth/config")return json({mode:authMode(env)});
    if(req.method==="GET"&&url.pathname==="/api/auth/session"){const user=await session(req,env);return user?json({authenticated:true,email:user.email}):error("Unauthorized",401);}
