@@ -29,4 +29,38 @@ describe("direct publishing endpoint security", () => {
   const poll=await worker.fetch(new Request(base+"/api/check",{method:"POST"}),env);
   expect(poll.status).toBe(503);
  });
+ it("rejects image upload when R2 is unavailable",async()=>{
+  const baseSecret="test-session-secret-with-adequate-length";
+  const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(baseSecret));
+  const env={DB:{} as any,GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:baseSecret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
+  const res=await worker.fetch(new Request(base+"/api/media",{method:"POST",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token,"Content-Type":"image/png"},body:new Uint8Array([137,80,78,71,13,10,26,10,0])}),env);
+  expect(res.status).toBe(503);
+ });
+ it("accepts a valid PNG into R2 and makes it retrievable",async()=>{
+  const secret="test-session-secret-with-adequate-length";
+  const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
+  const objects=new Map<string,Uint8Array>();
+  const bucket={
+   async put(key:string,data:Uint8Array){objects.set(key,data);return {};},
+   async get(key:string){const data=objects.get(key);return data?{body:new ReadableStream({start(c){c.enqueue(data);c.close();}}),httpMetadata:{contentType:"image/png"}}:null;}
+  };
+  const env={DB:{} as any,MEDIA:bucket,GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
+  const png=new Uint8Array([137,80,78,71,13,10,26,10,0]);
+  const res=await worker.fetch(new Request(base+"/api/media",{method:"POST",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token,"Content-Type":"image/png"},body:png}),env);
+  expect(res.status).toBe(201);
+  const output=await res.json() as {url:string;key:string};
+  expect(output.url).toBe(base+"/media/"+output.key);
+  expect(objects.size).toBe(1);
+  const imageResponse=await worker.fetch(new Request(output.url),env);
+  expect(imageResponse.status).toBe(200);
+  expect(imageResponse.headers.get("content-type")).toBe("image/png");
+  expect(new Uint8Array(await imageResponse.arrayBuffer())).toEqual(png);
+ });
+ it("rejects an image with a forged media type",async()=>{
+  const secret="test-session-secret-with-adequate-length";
+  const token=await new SignJWT({email:"alice@gmail.com",sub:"alice"}).setProtectedHeader({alg:"HS256"}).setIssuer(base).setAudience("admin").setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(secret));
+  const env={DB:{} as any,MEDIA:{put:async()=>{throw Error("must not save");}},GOOGLE_CLIENT_ID:"id",GOOGLE_CLIENT_SECRET:"secret",SESSION_SECRET:secret,ALLOWED_EMAILS:"alice@gmail.com"} as any;
+  const res=await worker.fetch(new Request(base+"/api/media",{method:"POST",headers:{Origin:base,Cookie:"__Host-broadcast_session="+token,"Content-Type":"image/png"},body:new Uint8Array([1,2,3,4,5,6,7,8,9])}),env);
+  expect(res.status).toBe(415);
+ });
 });
