@@ -134,6 +134,30 @@ async function admin(req:Request,env:Env,url:URL){
   }
   return json({id,created:platforms.length,status:"pending_review"},201);
  }
+ if(req.method==="PUT"&&/^\\/api\\/posts\\/[a-f0-9-]{36}$/.test(url.pathname)){
+  const eventId=url.pathname.split("/").pop()!;
+  const body:any=await req.json().catch(()=>null);
+  if(!body||typeof body.text!=="string")return error("本文を入力してください");
+  const message=body.text.trim();
+  if(!message||message.length>2200)return error("本文は1〜2200文字で入力してください");
+  const platforms=(["x","instagram"] as const).filter(p=>body[p]===true);
+  if(!platforms.length)return error("投稿先を選択してください");
+  if(platforms.includes("x")&&message.length>280)return error("Xへの投稿は280文字以内にしてください");
+  const imageUrls:unknown=body.image_urls;
+  if(!Array.isArray(imageUrls)||imageUrls.length>4||imageUrls.some(x=>typeof x!=="string"||!httpUrl(x))||new Set(imageUrls).size!==imageUrls.length)return error("画像は最大4枚まで、公開HTTPS URLを指定してください");
+  const images=imageUrls as string[];
+  if(platforms.includes("instagram")&&!images.length)return error("Instagramには画像が必要です");
+  const existing=await env.DB.prepare("SELECT d.id,d.platform,d.status,s.id AS source_id FROM deliveries d JOIN events e ON e.id=d.event_id JOIN sources s ON s.id=e.source_id WHERE d.event_id=?").bind(eventId).all<{id:string;platform:string;status:string;source_id:string}>();
+  if(!existing.results.length||existing.results.some(d=>d.source_id!=="manual-broadcast"||d.status!=="pending_review"))return error("確認待ちの投稿のみ編集できます",409);
+  // batch runs as a single D1 transaction, so a failed write cannot leave a partial edit.
+  const queries=[
+   env.DB.prepare("UPDATE events SET title=?,description=?,image_url=?,image_urls=? WHERE id=?").bind(message.slice(0,70),message,images[0]||null,JSON.stringify(images),eventId),
+   env.DB.prepare("DELETE FROM deliveries WHERE event_id=? AND status='pending_review'").bind(eventId),
+   ...platforms.map(platform=>env.DB.prepare("INSERT INTO deliveries(id,event_id,platform,text,image_url) VALUES(?,?,?,?,?)").bind(uid(),eventId,platform,message,images[0]||null))
+  ];
+  await env.DB.batch(queries);
+  return json({updated:1});
+ }
  const match=url.pathname.match(/^\/api\/deliveries\/([\w-]+)\/(approve|delete)$/);
  if(req.method==="POST"&&match){
   const [ ,id,action]=match;
