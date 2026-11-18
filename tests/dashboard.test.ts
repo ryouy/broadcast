@@ -11,6 +11,12 @@ describe("dashboard", () => {
   expect(source).not.toContain("PERSONAL WORKSPACE");
   expect(source).toContain("Publishing queue");
   expect(source).toContain('id="login-form"');
+  const configRoute=source.indexOf('url.pathname==="/api/auth/config"');
+  const adminRoute=source.lastIndexOf('url.pathname.startsWith("/api/")');
+  expect(configRoute).toBeGreaterThan(0);
+  expect(configRoute).toBeLessThan(adminRoute);
+  expect(source).toContain('url.pathname==="/auth/google"');
+  expect(source).toContain('url.pathname==="/auth/callback"');
   expect(source).toContain('id="newSource"');
   expect(source).toContain('class="workspace-panels"');
   expect(source).toContain('id="queue-paging"');
