@@ -5,7 +5,6 @@ export interface AuthEnv {
  GOOGLE_CLIENT_SECRET?: string;
  SESSION_SECRET?: string;
  ALLOWED_EMAILS?: string;
- ADMIN_TOKEN?: string; // Temporary fallback until Google OAuth is configured.
 }
 
 export const BASE_URL = "https://broadcast.ryouy.workers.dev";
@@ -20,10 +19,9 @@ const parseCookies = (req: Request) => Object.fromEntries((req.headers.get("cook
 const cookie = (name:string,value:string,maxAge:number,path="/") => name+"="+value+"; Path="+path+"; Max-Age="+maxAge+"; HttpOnly; Secure; SameSite=Lax";
 const redirect = (location:string,headers?:HeadersInit) => {const h=new Headers(headers);h.set("Location",location);h.set("Cache-Control","no-store");return new Response(null,{status:303,headers:h});};
 
-export function authMode(env:AuthEnv):"google"|"token"|"unconfigured"{
- const anyGoogle = Boolean(env.GOOGLE_CLIENT_ID||env.GOOGLE_CLIENT_SECRET||env.SESSION_SECRET||env.ALLOWED_EMAILS);
+export function authMode(env:AuthEnv):"google"|"unconfigured"{
  const configured = Boolean(env.GOOGLE_CLIENT_ID&&env.GOOGLE_CLIENT_SECRET&&env.SESSION_SECRET&&env.ALLOWED_EMAILS);
- return configured?"google":anyGoogle?"unconfigured":"token";
+ return configured?"google":"unconfigured";
 }
 export function permittedEmail(email:string,allowlist:string):boolean{
  return allowlist.split(/[;,\n]/).map(s=>s.trim().toLowerCase()).filter(Boolean).includes(email.trim().toLowerCase());
