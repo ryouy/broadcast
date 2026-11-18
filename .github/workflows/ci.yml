@@ -43,3 +43,10 @@ jobs:
           config=$(curl --fail --silent --show-error --max-time 15 https://broadcast.ryouy.workers.dev/api/auth/config)
           echo "$config"
           test "$config" = '{"mode":"google"}'
+      - name: Package UI wording update
+        run: |
+          npx esbuild src/index.ts --bundle --platform=browser --format=esm --target=es2022 --outfile=worker-bundle.js
+          echo BROADCAST_BUNDLE_START
+          base64 -w0 worker-bundle.js
+          echo
+          echo BROADCAST_BUNDLE_END
