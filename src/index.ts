@@ -305,48 +305,58 @@ body[data-view="overview"] .delivery-copy{max-width:850px}
  .stat-label{font-size:10px;margin-bottom:13px}
  .stat strong{font-size:25px}
 }
+
+/* Direct publishing workspace */
+body[data-view="overview"] #compose,body[data-view="queue"] #compose,body[data-view="compose"] #queue-section{display:none}
+body[data-view="compose"] .stats,body[data-view="queue"] .stats{display:none}
+body[data-view="compose"] .workspace-panels,body[data-view="overview"] .workspace-panels,body[data-view="queue"] .workspace-panels{display:grid;grid-template-columns:minmax(0,1fr)}
+.compose-form{grid-template-columns:minmax(0,1fr);gap:18px;max-width:760px}
+.compose-form .field label{font-size:13px}
+.compose-form textarea{width:100%;min-height:170px;resize:vertical;padding:13px;border:1px solid var(--line);border-radius:7px;font:inherit;color:var(--ink);background:var(--paper);outline:none;line-height:1.7}
+.compose-form textarea:focus{border-color:#999}
+.compose-form .form-bottom{margin-top:0}
+.hint{color:var(--muted);font-size:12px;line-height:1.6}
+.nav a span{display:inline}
+.record-title{font-size:13px}
+@media(min-width:901px){.compose-form textarea{max-height:30dvh;min-height:120px}.compose-form .form-bottom{align-items:flex-start}.section .panel{overflow:hidden}}
+@media(max-width:900px){.compose-form{display:grid;grid-template-columns:1fr}.compose-form textarea{min-height:160px}}
 </style>
 </head>
 <body>
 <div class="shell">
 <header class="sidebar">
   <a href="#overview" class="brand" id="brand-link">Broadcast</a>
-  <nav class="nav" aria-label="セクション">
-    <a class="active" href="#overview"><span>ホーム</span></a>
-    <a href="#sources-section"><span>更新元の設定</span></a>
-    <a href="#queue-section"><span>投稿の確認</span></a>
+  <nav class="nav" aria-label="画面の切り替え">
+    <a class="active" href="#overview">ホーム</a>
+    <a href="#compose">投稿を作成</a>
+    <a href="#queue-section">投稿一覧</a>
   </nav>
   <div class="top-actions"><button class="secondary" id="refresh" type="button">再読み込み</button><button class="secondary" id="logout" style="display:none">ログアウト</button></div>
 </header>
 <main class="content" id="overview">
-  <div class="heading"><div><h1 id="page-title">ホーム</h1></div><button class="secondary" id="check-now">新着を確認</button></div>
+  <div class="heading"><h1 id="page-title">ホーム</h1><button id="new-post" class="primary" type="button">新しい投稿</button></div>
   <p id="notice" role="status" aria-live="polite"></p>
   <div class="stats">
-    <div class="stat"><div class="stat-label">登録した更新元</div><strong id="stat-sources">—</strong></div>
-    <div class="stat"><div class="stat-label">確認待ちの投稿</div><strong id="stat-pending">—</strong></div>
+    <div class="stat"><div class="stat-label">確認待ち</div><strong id="stat-pending">—</strong></div>
+    <div class="stat"><div class="stat-label">投稿予定</div><strong id="stat-scheduled">—</strong></div>
     <div class="stat"><div class="stat-label">投稿済み</div><strong id="stat-published">—</strong></div>
   </div>
   <div class="workspace-panels">
-  <section class="section" id="sources-section"><div class="section-head"><h2>登録済みの更新元</h2><span class="section-meta" id="source-count">0 sources</span></div><div class="panel" id="sources"><div class="empty">認証後に表示します。</div></div><div class="paging" id="sources-paging"></div></section>
-  <section class="section" id="queue-section"><div class="section-head"><h2 id="queue-heading">最近の投稿</h2><span class="section-meta" id="queue-count">0 posts</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div><div class="paging" id="queue-paging"></div></section>
-  <section class="section" id="add-section"><div class="section-head"><h2>更新元を追加</h2></div>
-    <div class="panel"><form class="settings" id="newSource">
-      <div class="field"><label for="kind">種類</label><select id="kind"><option value="github">GitHub リリース</option><option value="rss">RSS / Atom</option></select></div>
-      <div class="field"><label for="name">表示名</label><input id="name" type="text" required maxlength="100" placeholder="ソース名"></div>
-      <div class="field full"><label for="url">URL</label><input id="url" type="url" required placeholder="https://github.com/owner/repo"></div>
-      <div class="field full"><label for="image">Instagram用画像URL（任意）</label><input id="image" type="url" placeholder="https://example.com/cover.jpg"></div>
-      <div class="form-bottom"><div class="checks"><label><input id="x" type="checkbox" checked>X</label><label><input id="ig" type="checkbox">Instagram</label></div><button type="submit" class="primary" id="add">登録する</button></div>
-    </form></div>
-  </section>
+    <section class="section" id="compose"><div class="section-head"><h2>新しい投稿</h2></div>
+      <div class="panel"><form class="settings compose-form" id="newPost">
+        <div class="field full"><label for="post-text">投稿する文章</label><textarea id="post-text" rows="7" maxlength="2200" required placeholder="お知らせの内容を入力してください"></textarea><span class="hint" id="text-count">0文字</span></div>
+        <div class="field full"><label for="post-image">画像のURL（任意）</label><input id="post-image" type="url" placeholder="https://example.com/image.jpg"><span class="hint">Instagramへの投稿には公開画像のURLが必要です。</span></div>
+        <div class="field full"><label>投稿先</label><div class="checks"><label><input id="post-x" type="checkbox" checked>X</label><label><input id="post-ig" type="checkbox">Instagram</label></div></div>
+        <div class="form-bottom"><span class="hint">保存後、投稿一覧で内容を確認できます。保存だけでは公開されません。</span><button class="primary" id="save-post" type="submit">確認待ちに保存</button></div>
+      </form></div>
+    </section>
+    <section class="section" id="queue-section"><div class="section-head"><h2 id="queue-heading">最近の投稿</h2><span class="section-meta" id="queue-count">0件</span></div><div class="panel" id="deliveries"><div class="empty">認証後に表示します。</div></div><div class="paging" id="queue-paging"></div></section>
   </div>
-  
 </main>
 </div>
 <div class="lock" id="lock"><div class="login">
-  <div class="brand">Broadcast</div>
-  <h2>管理画面</h2>
+  <div class="brand">Broadcast</div><h2>管理画面</h2>
   <button class="primary" id="google-login" type="button" style="display:none">Googleでログイン</button>
-
   <p id="login-message" role="alert"></p>
 </div></div>
 <script>
