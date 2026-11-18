@@ -100,14 +100,14 @@ async function admin(req:Request,env:Env,url:URL){
     "user-agent":"broadcast-media-uploader",
     "content-type":"application/json"
    },
-   body:JSON.stringify({message:"media: upload image from Broadcast",content:encoded,branch:"main"})
+   body:JSON.stringify({message:"media: upload image from Broadcast",content:encoded,branch:"broadcast-images"})
   });
   if(!response.ok){
    console.error("GitHub media upload failed",response.status);
    return error(response.status===401||response.status===403?"GitHubの画像保存権限を確認してください":response.status===413||response.status===422?"GitHubに画像を保存できませんでした。画像サイズを確認してください":"GitHubへの画像保存に失敗しました",502);
   }
   // Public repository: the raw file can be fetched by Instagram without credentials.
-  return json({url:"https://raw.githubusercontent.com/"+githubRepo+"/main/"+path,key},201);
+  return json({url:"https://raw.githubusercontent.com/"+githubRepo+"/broadcast-images/"+path,key},201);
  }
  if(req.method==="POST"&&url.pathname==="/api/posts"){
   const body:any=await req.json().catch(()=>null);
