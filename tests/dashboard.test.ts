@@ -10,7 +10,12 @@ describe("dashboard", () => {
   expect(source).not.toContain("発信するものを、ひとつの場所で。");
   expect(source).not.toContain("PERSONAL WORKSPACE");
   expect(source).toContain("投稿一覧");
-  expect(source).toContain("投稿を作る");
+  expect(source).toContain("投稿を作成");
+  expect(source).not.toContain("保存してもSNSには投稿されません。");
+  expect(source).not.toContain("ここに投稿内容を入力");
+  expect(source).toContain("投稿内容を入力");
+  expect(source).not.toContain("見送る");
+  expect(source).toContain("削除");
   expect(source).not.toContain('>ホーム</a>');
   expect(source).not.toContain('id="new-post"');
   expect(source).not.toContain('id="stat-pending"');
