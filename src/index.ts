@@ -383,33 +383,77 @@ function pageControls(id,total,page,size,callback){
   button.addEventListener("click",()=>callback(n));box.append(button);
  }
 }
+function getImages(item){
+ try{
+  const values=JSON.parse(item.image_urls||"null");
+  if(Array.isArray(values))return values.filter(x=>typeof x==="string"&&x.startsWith("https://")).slice(0,4);
+ }catch{}
+ return item.image_url?[item.image_url]:[];
+}
+let galleryUrls=[],galleryPosition=0;
+function showImage(urls,index){
+ galleryUrls=urls;galleryPosition=index;
+ updateGallery();
+ $("image-dialog").showModal();
+}
+function updateGallery(){
+ $("image-large").src=galleryUrls[galleryPosition];
+ $("image-position").textContent=(galleryPosition+1)+" / "+galleryUrls.length+"枚";
+ $("image-prev").disabled=galleryPosition===0;
+ $("image-next").disabled=galleryPosition===galleryUrls.length-1;
+}
+$("image-close").addEventListener("click",()=>$("image-dialog").close());
+$("image-prev").addEventListener("click",()=>{galleryPosition=Math.max(0,galleryPosition-1);updateGallery();});
+$("image-next").addEventListener("click",()=>{galleryPosition=Math.min(galleryUrls.length-1,galleryPosition+1);updateGallery();});
+$("image-dialog").addEventListener("click",e=>{if(e.target===$("image-dialog"))$("image-dialog").close();});
+$("image-dialog").addEventListener("close",()=>{$("image-large").removeAttribute("src");});
 function renderQueue(items){
  allDeliveries=items;
- $("queue-count").textContent=items.length+"件";
+ const groups=new Map();
+ for(const item of items){
+  const key=item.event_id||item.id;
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push(item);
+ }
+ const posts=[...groups.values()];
+ $("queue-count").textContent=posts.length+"件";
  const box=$("deliveries");box.replaceChildren();
- const size=desktop()?8:Infinity;
- if(queuePage*size>=items.length)queuePage=0;
- pageControls("queue-paging",items.length,queuePage,size,n=>{queuePage=n;renderQueue(allDeliveries);});
- if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"まだ投稿はありません"));box.append(empty);return;}
- for(const item of items.slice(queuePage*size,queuePage*size+size)){
-  const row=el("div","delivery"),top=el("div","delivery-top");
-  const platform=el("div","platform",item.platform==="x"?"X":"IG");platform.title=item.platform==="x"?"X":"Instagram";
-  const record=el("div","record");
+ const size=desktop()?6:Infinity;
+ if(queuePage*size>=posts.length)queuePage=0;
+ pageControls("queue-paging",posts.length,queuePage,size,n=>{queuePage=n;renderQueue(allDeliveries);});
+ if(!posts.length){box.append(el("div","empty","まだ投稿はありません"));return;}
+ for(const entries of posts.slice(queuePage*size,queuePage*size+size)){
+  const item=entries[0],row=el("article","delivery"),top=el("div","delivery-top"),record=el("div","record");
   record.append(el("div","record-title",item.is_manual?item.text:item.title));
-  if(!item.is_manual&&item.source_url){
-   const link=el("a",null,item.source_name||"元のページ");link.href=item.source_url;link.target="_blank";link.rel="noopener noreferrer";
-   const sub=el("div","record-sub");sub.append(link);record.append(sub);
+  top.append(record);
+  row.append(top);
+  if(!item.is_manual){
+   if(item.text)row.append(el("p","delivery-copy",item.text));
+   if(item.source_url){const link=el("a","record-sub",item.source_name||"元のページ");link.href=item.source_url;link.target="_blank";link.rel="noopener noreferrer";row.append(link);}
   }
-  const end=el("div","end");end.append(el("span","pill "+statusClass(item.status),statusName(item.status)));
-  top.append(platform,record,end);row.append(top);
-  if(!item.is_manual&&item.text)row.append(el("p","delivery-copy",item.text.length>350?item.text.slice(0,350)+"…":item.text));
-  if(item.image_url){const link=el("a","record-sub","画像を見る");link.href=item.image_url;link.target="_blank";link.rel="noopener noreferrer";row.append(link);}
-  if(item.last_error)row.append(el("p","delivery-copy error-note",item.last_error));
-  if(item.status==="pending_review"){
-   const actions=el("div","delivery-actions"),approve=el("button","secondary","投稿を承認"),skip=el("button","secondary","見送る");
-   approve.type="button";skip.type="button";
-   approve.addEventListener("click",()=>act(item,"approve"));skip.addEventListener("click",()=>act(item,"skip"));
-   actions.append(approve,skip);row.append(actions);
+  const images=getImages(item);
+  if(images.length){
+   const gallery=el("div","delivery-gallery");
+   images.forEach((url,index)=>{
+    const btn=el("button","gallery-image");btn.type="button";btn.title="画像 "+(index+1)+" を拡大";
+    const img=el("img");img.src=url;img.loading="lazy";img.alt="投稿画像 "+(index+1);
+    btn.append(img);btn.addEventListener("click",()=>showImage(images,index));gallery.append(btn);
+   });
+   row.append(gallery);
+  }
+  for(const delivery of entries){
+   const target=el("div","delivery-target");
+   target.append(el("span","platform",delivery.platform==="x"?"X":"Instagram"));
+   target.append(el("span","pill "+statusClass(delivery.status),statusName(delivery.status)));
+   if(delivery.status==="pending_review"){
+    const approve=el("button","secondary","承認"),skip=el("button","secondary","見送る");
+    approve.type="button";skip.type="button";
+    approve.addEventListener("click",()=>act(delivery,"approve"));
+    skip.addEventListener("click",()=>act(delivery,"skip"));
+    target.append(approve,skip);
+   }
+   row.append(target);
+   if(delivery.last_error)row.append(el("p","delivery-copy error-note",delivery.last_error));
   }
   box.append(row);
  }
