@@ -39,6 +39,11 @@ describe("dashboard", () => {
   expect(source).toContain('id="post-text"');
   expect(source).toContain('rows="5"');
   expect(source).toContain('max-width:680px;margin:0 auto');
+  expect(source).toContain('max-width:330px');
+  expect(source).toContain('id="cancel-edit"');
+  expect(source).toContain('startEditing(entries)');
+  expect(source).toContain('existingImages=getImages(item).slice()');
+  expect(source).toContain('method:editing?"PUT":"POST"');
   expect(source).toContain('height:158px;min-height:128px');
   expect(source).toContain('画像を選択');
   expect(source).toContain("window.addEventListener(\"hashchange\",navigate)");
