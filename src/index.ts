@@ -260,26 +260,22 @@ const $=id=>document.getElementById(id);
 const el=(tag,cls,value)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(value!==undefined)e.textContent=String(value);return e;};
 let isAuthenticated=false,allDeliveries=[],queuePage=0,connections={x:false,instagram:false};
 const desktop=()=>matchMedia("(min-width:901px)").matches;
-const view=()=>document.body.dataset.view||"overview";
+const view=()=>document.body.dataset.view||"compose";
 function notice(message,bad=false){$("notice").textContent=message;$("notice").classList.toggle("error",bad);}
 function setView(v){
- if(!["overview","compose","queue"].includes(v))v="overview";
+ if(v!=="compose"&&v!=="queue")v="compose";
  document.body.dataset.view=v;
- $("page-title").textContent=({overview:"ホーム",compose:"投稿を作成",queue:"投稿一覧"})[v];
- $("queue-heading").textContent=v==="overview"?"最近の投稿":"投稿一覧";
- $("new-post").style.display=v==="compose"?"none":"inline-flex";
  document.querySelectorAll(".nav a").forEach(a=>{
-  const active=a.getAttribute("href")===(v==="overview"?"#overview":v==="compose"?"#compose":"#queue-section");
+  const active=a.getAttribute("href")===(v==="compose"?"#compose":"#queue-section");
   a.classList.toggle("active",active);
   if(active)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");
  });
  renderQueue(allDeliveries);
 }
-function navigate(){const hash=location.hash;setView(hash==="#compose"?"compose":hash==="#queue-section"?"queue":"overview");}
+function navigate(){setView(location.hash==="#queue-section"?"queue":"compose");}
 function goTo(hash){history.replaceState(null,"",hash);navigate();}
 document.querySelectorAll(".nav a,#brand-link").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();goTo(a.getAttribute("href"));}));
 window.addEventListener("hashchange",navigate);
-$("new-post").addEventListener("click",()=>{goTo("#compose");$("post-text").focus();});
 navigate();
 async function api(path,init={}){
  const response=await fetch(path,{...init,credentials:"same-origin"});
@@ -301,11 +297,8 @@ function pageControls(id,total,page,size,callback){
 function renderQueue(items){
  allDeliveries=items;
  $("queue-count").textContent=items.length+"件";
- $("stat-pending").textContent=items.filter(x=>x.status==="pending_review").length;
- $("stat-scheduled").textContent=items.filter(x=>x.status==="scheduled").length;
- $("stat-published").textContent=items.filter(x=>x.status==="published").length;
  const box=$("deliveries");box.replaceChildren();
- const size=desktop()?(view()==="overview"?3:5):Infinity;
+ const size=desktop()?8:Infinity;
  if(queuePage*size>=items.length)queuePage=0;
  pageControls("queue-paging",items.length,queuePage,size,n=>{queuePage=n;renderQueue(allDeliveries);});
  if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"まだ投稿はありません"));box.append(empty);return;}
@@ -338,7 +331,7 @@ async function load(){
   const [items,status]=await Promise.all([api("/api/deliveries"),api("/api/status")]);
   connections=status.connections||{x:false,instagram:false};
   renderQueue(items);
-  notice("更新: "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));
+  notice("");
  }catch(e){notice("読み込みに失敗しました: "+String(e),true);}
 }
 async function act(item,action){
@@ -371,7 +364,7 @@ $("newPost").addEventListener("submit",async e=>{
  const button=$("save-post");button.disabled=true;
  try{
   await api("/api/posts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:message,image_url:image,x,instagram})});
-  $("newPost").reset();countChars();await load();goTo("#queue-section");
+  $("newPost").reset();$("image-details").open=false;countChars();await load();goTo("#queue-section");
   notice("確認待ちに保存しました。内容を確認してから承認できます。");
  }catch(err){notice("保存できませんでした: "+String(err),true);}
  finally{button.disabled=false;}
