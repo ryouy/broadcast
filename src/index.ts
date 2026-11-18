@@ -363,121 +363,142 @@ body[data-view="compose"] .workspace-panels,body[data-view="overview"] .workspac
 (function(){
 "use strict";
 const $=id=>document.getElementById(id);
-let isAuthenticated=false;
-let allSources=[],allDeliveries=[],sourcePage=0,queuePage=0;
-const desktop=()=>window.matchMedia("(min-width:901px)").matches;
+const el=(tag,cls,value)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(value!==undefined)e.textContent=String(value);return e;};
+let isAuthenticated=false,allDeliveries=[],queuePage=0,connections={x:false,instagram:false};
+const desktop=()=>matchMedia("(min-width:901px)").matches;
 const view=()=>document.body.dataset.view||"overview";
-function setView(v){if(!["overview","sources","queue"].includes(v))v="overview";document.body.dataset.view=v;const title=({overview:"ホーム",sources:"更新元の設定",queue:"投稿の確認"})[v];$("page-title").textContent=title;$("queue-heading").textContent=v==="overview"?"最近の投稿":"投稿一覧";document.querySelectorAll(".nav a").forEach(a=>{const active=a.getAttribute("href")===(v==="overview"?"#overview":v==="sources"?"#sources-section":"#queue-section");a.classList.toggle("active",active);if(active)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});renderSources(allSources);renderQueue(allDeliveries);}
-function pageControls(id,total,page,size,onClick){const p=$(id);p.replaceChildren();if(!desktop()||total<=size)return;const count=Math.ceil(total/size);p.append(el("span",null,(page+1)+" / "+count));for(const [label,n] of [["前へ",page-1],["次へ",page+1]]){const b=el("button",null,label);b.type="button";b.disabled=n<0||n>=count;b.addEventListener("click",()=>onClick(n));p.append(b);}}
-
-const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=String(txt);return e;};
-function notice(msg,bad=false){$("notice").textContent=msg;$("notice").classList.toggle("error",bad);}
-async function api(path,init={}){
- const r=await fetch(path,{...init,credentials:"same-origin"});
- const body=await r.json().catch(()=>null);
- if(!r.ok)throw Error(r.status===401?"ログインの有効期限が切れました。再ログインしてください。":r.status===503?"Google OAuthの設定を確認してください。":body?.error||"HTTP "+r.status);
- return body;
+function notice(message,bad=false){$("notice").textContent=message;$("notice").classList.toggle("error",bad);}
+function setView(v){
+ if(!["overview","compose","queue"].includes(v))v="overview";
+ document.body.dataset.view=v;
+ $("page-title").textContent=({overview:"ホーム",compose:"投稿を作成",queue:"投稿一覧"})[v];
+ $("queue-heading").textContent=v==="overview"?"最近の投稿":"投稿一覧";
+ $("new-post").style.display=v==="compose"?"none":"inline-flex";
+ document.querySelectorAll(".nav a").forEach(a=>{
+  const active=a.getAttribute("href")===(v==="overview"?"#overview":v==="compose"?"#compose":"#queue-section");
+  a.classList.toggle("active",active);
+  if(active)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");
+ });
+ renderQueue(allDeliveries);
 }
-function statusName(s){return ({pending_review:"承認待ち",scheduled:"公開待ち",processing:"送信中",published:"公開済み",failed:"失敗",unknown:"要確認",skipped:"スキップ"})[s]||s;}
-function statusClass(s){return s==="pending_review"?"awaiting":s==="unknown"||s==="failed"?"failed":s==="skipped"?"muted":"";}
-function shorten(s,max=75){s=String(s||"");return s.length>max?s.slice(0,max)+"…":s;}
-function renderSources(sources){
- $("stat-sources").textContent=sources.length;
- $("source-count").textContent=sources.length+"件";
- allSources=sources;const panel=$("sources");panel.replaceChildren();
- const size=desktop()?4:Infinity;if(sourcePage*size>=sources.length)sourcePage=0;
- pageControls("sources-paging",sources.length,sourcePage,size,n=>{sourcePage=n;renderSources(allSources);});
- if(!sources.length){const empty=el("div","empty");empty.append(el("strong",null,"登録した更新元はありません"),el("span",null,""));panel.append(empty);return;}
- for(const s of sources.slice(sourcePage*size,sourcePage*size+size)){
-   const row=el("div","list-row");const ico=el("div","source-icon",s.type==="github"?"Git":"RSS");
-   const rec=el("div","record");rec.append(el("div","record-title",s.name));
-   const sub=el("div","record-sub");const a=el("a",null,s.url);a.href=s.url;a.target="_blank";a.rel="noopener noreferrer";sub.append(a);rec.append(sub);
-   const end=el("div","end");end.append(el("span","pill "+(s.last_check_error?"failed":""),s.last_check_error?"取得エラー":s.enabled?"監視中":"停止中"));
-   if(s.last_check_error)rec.append(el("div","record-sub error-note",s.last_check_error));
-   row.append(ico,rec,end);panel.append(row);
+function navigate(){const hash=location.hash;setView(hash==="#compose"?"compose":hash==="#queue-section"?"queue":"overview");}
+function goTo(hash){history.replaceState(null,"",hash);navigate();}
+document.querySelectorAll(".nav a,#brand-link").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();goTo(a.getAttribute("href"));}));
+window.addEventListener("hashchange",navigate);
+$("new-post").addEventListener("click",()=>{goTo("#compose");$("post-text").focus();});
+navigate();
+async function api(path,init={}){
+ const response=await fetch(path,{...init,credentials:"same-origin"});
+ const data=await response.json().catch(()=>null);
+ if(!response.ok)throw Error(response.status===401?"ログインの有効期限が切れました。再ログインしてください。":data?.error||"通信に失敗しました");
+ return data;
+}
+const statusName=s=>({pending_review:"確認待ち",scheduled:"投稿予定",processing:"送信中",published:"投稿済み",failed:"失敗",unknown:"要確認",skipped:"見送り"})[s]||s;
+const statusClass=s=>s==="pending_review"?"awaiting":s==="unknown"||s==="failed"?"failed":s==="skipped"?"muted":"";
+function pageControls(id,total,page,size,callback){
+ const box=$(id);box.replaceChildren();
+ if(!desktop()||total<=size)return;
+ const count=Math.ceil(total/size);box.append(el("span",null,(page+1)+" / "+count));
+ for(const [label,n] of [["前へ",page-1],["次へ",page+1]]){
+  const button=el("button",null,label);button.type="button";button.disabled=n<0||n>=count;
+  button.addEventListener("click",()=>callback(n));box.append(button);
  }
 }
 function renderQueue(items){
+ allDeliveries=items;
  $("queue-count").textContent=items.length+"件";
  $("stat-pending").textContent=items.filter(x=>x.status==="pending_review").length;
+ $("stat-scheduled").textContent=items.filter(x=>x.status==="scheduled").length;
  $("stat-published").textContent=items.filter(x=>x.status==="published").length;
- allDeliveries=items;const panel=$("deliveries");panel.replaceChildren();
- const size=desktop()?(view()==="queue"?5:3):Infinity;if(queuePage*size>=items.length)queuePage=0;
+ const box=$("deliveries");box.replaceChildren();
+ const size=desktop()?(view()==="overview"?3:5):Infinity;
+ if(queuePage*size>=items.length)queuePage=0;
  pageControls("queue-paging",items.length,queuePage,size,n=>{queuePage=n;renderQueue(allDeliveries);});
- if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"まだ投稿はありません"),el("span",null,""));panel.append(empty);return;}
- for(const d of items.slice(queuePage*size,queuePage*size+size)){
-  const item=el("div","delivery");const top=el("div","delivery-top");
-  const platform=el("div","platform",d.platform==="x"?"X":"IG");platform.title=d.platform;
-  const rec=el("div","record");rec.append(el("div","record-title",d.title));
-  const sub=el("div","record-sub");const a=el("a",null,d.source_name||"ソースを開く");a.href=d.source_url;a.target="_blank";a.rel="noopener noreferrer";sub.append(a);rec.append(sub);
-  const end=el("div","end");end.append(el("span","pill "+statusClass(d.status),statusName(d.status)));
-  top.append(platform,rec,end);item.append(top);
-  if(d.text)item.append(el("p","delivery-copy",shorten(d.text,280)));
-  if(d.last_error)item.append(el("p","delivery-copy error-note",d.last_error));
-  if(d.status==="pending_review"){
-    const buttons=el("div","delivery-actions");
-    const approve=el("button","secondary","承認する");const skip=el("button","secondary","スキップ");
-    approve.addEventListener("click",()=>act(d.id,"approve",d.title));skip.addEventListener("click",()=>act(d.id,"skip",d.title));
-    buttons.append(approve,skip);item.append(buttons);
+ if(!items.length){const empty=el("div","empty");empty.append(el("strong",null,"まだ投稿はありません"));box.append(empty);return;}
+ for(const item of items.slice(queuePage*size,queuePage*size+size)){
+  const row=el("div","delivery"),top=el("div","delivery-top");
+  const platform=el("div","platform",item.platform==="x"?"X":"IG");platform.title=item.platform==="x"?"X":"Instagram";
+  const record=el("div","record");
+  record.append(el("div","record-title",item.is_manual?item.text:item.title));
+  if(!item.is_manual&&item.source_url){
+   const link=el("a",null,item.source_name||"元のページ");link.href=item.source_url;link.target="_blank";link.rel="noopener noreferrer";
+   const sub=el("div","record-sub");sub.append(link);record.append(sub);
   }
-  panel.append(item);
+  const end=el("div","end");end.append(el("span","pill "+statusClass(item.status),statusName(item.status)));
+  top.append(platform,record,end);row.append(top);
+  if(!item.is_manual&&item.text)row.append(el("p","delivery-copy",item.text.length>350?item.text.slice(0,350)+"…":item.text));
+  if(item.image_url){const link=el("a","record-sub","画像を見る");link.href=item.image_url;link.target="_blank";link.rel="noopener noreferrer";row.append(link);}
+  if(item.last_error)row.append(el("p","delivery-copy error-note",item.last_error));
+  if(item.status==="pending_review"){
+   const actions=el("div","delivery-actions"),approve=el("button","secondary","投稿を承認"),skip=el("button","secondary","見送る");
+   approve.type="button";skip.type="button";
+   approve.addEventListener("click",()=>act(item,"approve"));skip.addEventListener("click",()=>act(item,"skip"));
+   actions.append(approve,skip);row.append(actions);
+  }
+  box.append(row);
  }
 }
 async function load(){
- notice("データを読み込んでいます…");
- try{const [sources,items]=await Promise.all([api("/api/sources"),api("/api/deliveries")]);renderSources(sources);renderQueue(items);notice("最終更新: "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));return true;}
- catch(e){notice("読み込みに失敗しました: "+String(e),true);throw e;}
+ notice("読み込み中…");
+ try{
+  const [items,status]=await Promise.all([api("/api/deliveries"),api("/api/status")]);
+  connections=status.connections||{x:false,instagram:false};
+  renderQueue(items);
+  notice("更新: "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));
+ }catch(e){notice("読み込みに失敗しました: "+String(e),true);}
 }
-async function act(id,action,title){
- const isApprove=action==="approve";
- if(!confirm((isApprove?"「"+title+"」を公開キューに送りますか？SNS認証が有効なら次回実行時に投稿されます。":"「"+title+"」をスキップしますか？")))return;
- try{await api("/api/deliveries/"+encodeURIComponent(id)+"/"+action,{method:"POST"});await load();}
- catch(e){notice(String(e),true);}
+async function act(item,action){
+ if(action==="approve"&&!connections[item.platform]){
+  notice((item.platform==="x"?"X":"Instagram")+"の連携が未設定です。先にアカウントを接続してください。",true);
+  return;
+ }
+ if(!confirm(action==="approve"?"この投稿を承認しますか？ 次の配信処理でSNSに送信されます。":"この投稿を見送りますか？"))return;
+ try{
+  const result=await api("/api/deliveries/"+encodeURIComponent(item.id)+"/"+action,{method:"POST"});
+  if(result.updated!==1)throw Error("すでに処理された可能性があります");
+  await load();
+ }catch(e){notice(String(e),true);}
 }
-document.body.dataset.view="overview";
-function navigationFromHash(){const h=location.hash;setView(h==="#sources-section"?"sources":h==="#queue-section"?"queue":"overview");}
-document.querySelectorAll(".nav a, #brand-link").forEach(a=>a.addEventListener("click",ev=>{ev.preventDefault();const h=a.getAttribute("href");history.replaceState(null,"",h);navigationFromHash();}));
-window.addEventListener("hashchange",navigationFromHash);
-navigationFromHash();
-window.addEventListener("resize",()=>{renderSources(allSources);renderQueue(allDeliveries);});
+function countChars(){
+ const count=$("post-text").value.length;
+ $("text-count").textContent=count+"文字"+($("post-x").checked?" / Xは280文字まで":"");
+ $("text-count").style.color=$("post-x").checked&&count>280?"#a13d36":"";
+}
+$("post-text").addEventListener("input",countChars);
+$("post-x").addEventListener("change",countChars);
+$("newPost").addEventListener("submit",async e=>{
+ e.preventDefault();if(!isAuthenticated)return;
+ const message=$("post-text").value.trim(),image=$("post-image").value.trim();
+ const x=$("post-x").checked,instagram=$("post-ig").checked;
+ if(!message)return notice("文章を入力してください。",true);
+ if(!x&&!instagram)return notice("投稿先を選んでください。",true);
+ if(x&&message.length>280)return notice("Xへの投稿は280文字以内にしてください。",true);
+ if(instagram&&!image)return notice("Instagramには画像のURLが必要です。",true);
+ const button=$("save-post");button.disabled=true;
+ try{
+  await api("/api/posts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:message,image_url:image,x,instagram})});
+  $("newPost").reset();countChars();await load();goTo("#queue-section");
+  notice("確認待ちに保存しました。内容を確認してから承認できます。");
+ }catch(err){notice("保存できませんでした: "+String(err),true);}
+ finally{button.disabled=false;}
+});
+$("refresh").addEventListener("click",()=>{if(isAuthenticated)void load();});
 async function initAuth(){
  try{
-  const res=await fetch("/api/auth/config",{cache:"no-store"});
-  if(!res.ok)throw Error("認証設定の取得に失敗しました。");
+  const res=await fetch("/api/auth/config",{cache:"no-store"});if(!res.ok)throw Error();
   const config=await res.json();
-  if(config.mode!=="google"){$("login-message").textContent="Google OAuthの設定が完了していません。";return;}
+  if(config.mode!=="google"){$("login-message").textContent="Google認証の設定が完了していません。";return;}
   $("google-login").style.display="block";
   const check=await fetch("/api/auth/session",{credentials:"same-origin",cache:"no-store"});
-  if(check.ok){
-   isAuthenticated=true;
-   $("logout").style.display="inline-flex";
-   $("lock").classList.add("hidden");
-   try{await load();}catch(e){notice("データの取得に失敗しました。更新してください。",true);}
-  }
+  if(check.ok){isAuthenticated=true;$("logout").style.display="inline-flex";$("lock").classList.add("hidden");await load();}
   const authError=new URL(location.href).searchParams.get("auth_error");
-  if(authError)$("login-message").textContent=authError==="denied"?"このGoogleアカウントは許可されていません。":"Googleログインに失敗しました。もう一度お試しください。";
+  if(authError)$("login-message").textContent=authError==="denied"?"このGoogleアカウントは許可されていません。":"Googleログインに失敗しました。";
  }catch(e){$("login-message").textContent="認証設定を読み込めませんでした。";}
 }
-$("google-login").addEventListener("click",()=>{window.location.assign("/auth/google");});
-$("logout").addEventListener("click",async()=>{
- try{await fetch("/auth/logout",{method:"POST",credentials:"same-origin"});}finally{window.location.assign("/");}
-});
-void initAuth();
-$("refresh").addEventListener("click",()=>{if(!isAuthenticated)return;load().catch(()=>{});});
-$("check-now").addEventListener("click",async()=>{
- if(!isAuthenticated)return;
- const b=$("check-now");b.disabled=true;b.textContent="確認中…";
- try{await api("/api/check",{method:"POST"});await load();notice("更新を確認しました。");}
- catch(e){notice("更新確認に失敗しました: "+String(e),true);}
- finally{b.disabled=false;b.textContent="新着を確認";}
-});
-$("newSource").addEventListener("submit",async ev=>{
- ev.preventDefault();if(!isAuthenticated)return;
- const b=$("add");b.disabled=true;
- try{await api("/api/sources",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:$("kind").value,name:$("name").value,url:$("url").value,default_image_url:$("image").value||null,post_x:$("x").checked,post_instagram:$("ig").checked})});$("newSource").reset();await load();notice("更新元を登録しました。");}
- catch(e){notice("追加できませんでした: "+String(e),true);}
- finally{b.disabled=false;}
-});
+$("google-login").addEventListener("click",()=>location.assign("/auth/google"));
+$("logout").addEventListener("click",async()=>{try{await fetch("/auth/logout",{method:"POST",credentials:"same-origin"});}finally{location.assign("/");}});
+window.addEventListener("resize",()=>renderQueue(allDeliveries));
+countChars();void initAuth();
 })();
 </script>
 </body></html>`;
