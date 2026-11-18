@@ -283,6 +283,30 @@ textarea:focus,.text-input:focus{border-color:#555}
 .image-dialog-controls{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:10px}
 .image-dialog-controls .secondary{font-size:14px}
 @media(max-width:650px){.delivery{padding:14px 12px}.record-title{font-size:16px}.delivery-gallery{grid-template-columns:repeat(auto-fill,minmax(90px,1fr))}.gallery-image img{height:105px}.file-choose span{width:100%}}
+
+/* Focused, compact editor */
+.main{max-width:1100px;padding-top:26px}
+#compose .form-area{max-width:680px;margin:0 auto}
+#compose .field{margin-bottom:19px}
+#compose .field>label:not(.file-choose),#compose .field-label{font-size:14px;margin-bottom:8px;font-weight:600}
+#compose textarea{height:158px;min-height:128px;max-height:55vh;padding:12px 14px;font-size:15px;line-height:1.65;border-radius:6px}
+#compose .field-meta{margin-top:6px}
+#compose .checks{gap:24px}
+#compose .checks label{font-size:15px;display:inline-flex;gap:9px;align-items:center}
+#compose .checks input{width:17px;height:17px;margin:0}
+#compose .file-choose{height:76px;min-height:76px;display:flex!important;justify-content:center;align-items:center;gap:10px;padding:12px 16px;border-color:#cecece;border-radius:6px;background:#fafafa}
+#compose .file-choose-title{font-size:14px;color:#222;font-weight:600}
+#compose .file-choose-note{font-size:12px;color:#777;font-weight:400}
+#compose .image-preview{margin-top:12px}
+#compose .form-actions{margin-top:22px}
+#compose .primary{min-width:112px;padding:10px 20px;font-size:14px}
+@media(max-width:700px){
+ .main{padding:18px 16px 26px}
+ #compose .form-area{max-width:none}
+ #compose textarea{height:165px;min-height:135px}
+ #compose .file-choose{height:82px;flex-direction:column;gap:2px}
+ #compose .file-choose-note{width:auto}
+}
 </style>
 </head>
 <body data-view="compose">
@@ -303,7 +327,7 @@ textarea:focus,.text-input:focus{border-color:#555}
   <form id="newPost" class="form-area">
    <div class="field">
     <label for="post-text">文章</label>
-    <textarea id="post-text" rows="7" maxlength="2200" required placeholder="投稿内容を入力"></textarea>
+    <textarea id="post-text" rows="5" maxlength="2200" required placeholder="投稿内容を入力"></textarea>
     <div class="field-meta"><span class="hint" id="text-count">0文字</span></div>
    </div>
    <div class="field">
@@ -311,8 +335,8 @@ textarea:focus,.text-input:focus{border-color:#555}
     <div class="checks"><label><input id="post-x" type="checkbox" checked>X</label><label><input id="post-ig" type="checkbox">Instagram</label></div>
    </div>
    <div class="field image-upload-field">
-    <label for="post-file">画像を追加（最大4枚）</label>
-    <label class="file-choose" for="post-file">画像を選ぶ <span>または、ここにドラッグして追加</span></label>
+    <label for="post-file">画像</label>
+    <label class="file-choose" for="post-file"><span class="file-choose-title">画像を選択</span><span class="file-choose-note">最大4枚・ドラッグ＆ドロップ対応</span></label>
     <input id="post-file" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="upload-help">
     <div class="hint" id="upload-help"></div>
     <div id="image-preview" class="image-preview" aria-live="polite"></div>
