@@ -37,6 +37,10 @@ describe("dashboard", () => {
   expect(source).toContain('url.pathname==="/favicon.svg"');
   expect(source).toContain('id="newPost"');
   expect(source).toContain('id="post-text"');
+  expect(source).toContain('rows="5"');
+  expect(source).toContain('max-width:680px;margin:0 auto');
+  expect(source).toContain('height:158px;min-height:128px');
+  expect(source).toContain('画像を選択');
   expect(source).toContain("window.addEventListener(\"hashchange\",navigate)");
   expect(source.indexOf("<header class=\"site-header\">")).toBeLessThan(source.indexOf("<main class=\"main\""));
   expect(source).not.toContain('id="login-form"');
