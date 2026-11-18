@@ -63,7 +63,7 @@ async function admin(req:Request,env:Env,url:URL){
   return json({ok:true,counts:counts.results,connections:{x:!!env.X_USER_ACCESS_TOKEN,instagram:!!(env.INSTAGRAM_ACCESS_TOKEN&&env.INSTAGRAM_USER_ID)},media_enabled:!!env.GITHUB_MEDIA_TOKEN});
  }
  if(req.method==="GET"&&url.pathname==="/api/deliveries"){
-  const rows=await env.DB.prepare("SELECT d.*,e.title,e.url AS source_url,s.name AS source_name,CASE WHEN s.id='manual-broadcast' THEN 1 ELSE 0 END AS is_manual FROM deliveries d JOIN events e ON e.id=d.event_id JOIN sources s ON s.id=e.source_id ORDER BY d.created_at DESC LIMIT 100").all();
+  const rows=await env.DB.prepare("SELECT d.*,e.title,e.image_urls,e.url AS source_url,s.name AS source_name,CASE WHEN s.id='manual-broadcast' THEN 1 ELSE 0 END AS is_manual FROM deliveries d JOIN events e ON e.id=d.event_id JOIN sources s ON s.id=e.source_id ORDER BY d.created_at DESC LIMIT 100").all();
   return json(rows.results);
  }
  if(req.method==="POST"&&url.pathname==="/api/media"){
@@ -117,13 +117,17 @@ async function admin(req:Request,env:Env,url:URL){
   const platforms=["x","instagram"].filter(p=>body[p]===true);
   if(!platforms.length)return error("投稿先を選択してください");
   if(platforms.includes("x")&&message.length>280)return error("Xへの投稿は280文字以内にしてください");
-  const image=typeof body.image_url==="string"?body.image_url.trim():"";
-  if(image&&!httpUrl(image))return error("画像には公開HTTPS URLを指定してください");
-  if(platforms.includes("instagram")&&!image)return error("Instagramには画像URLが必要です");
+  const images:unknown=body.image_urls;
+  if(images!==undefined&&(!Array.isArray(images)||images.length>4||images.some(x=>typeof x!=="string"||!httpUrl(x))))return error("画像は最大4枚まで、公開HTTPS URLを指定してください");
+  const imageUrls:string[]=images===undefined?(typeof body.image_url==="string"&&body.image_url.trim()?[body.image_url.trim()]:[]):images as string[];
+  if(imageUrls.some(x=>!httpUrl(x)))return error("画像URLが正しくありません");
+  if(new Set(imageUrls).size!==imageUrls.length)return error("同じ画像を複数回指定できません");
+  const image=imageUrls[0]||"";
+  if(platforms.includes("instagram")&&!image)return error("Instagramには画像が必要です");
   const id=uid(),eid=uid();
   await env.DB.prepare("INSERT OR IGNORE INTO sources(id,type,name,url,enabled,post_x,post_instagram) VALUES('manual-broadcast','github','Broadcast','https://broadcast.ryouy.workers.dev/',0,0,0)").run();
-  await env.DB.prepare("INSERT INTO events(id,source_id,external_id,title,description,url,image_url) VALUES(?,'manual-broadcast',?,?,?,?,?)")
-   .bind(eid,id,message.slice(0,70),message,"https://broadcast.ryouy.workers.dev/",image||null).run();
+  await env.DB.prepare("INSERT INTO events(id,source_id,external_id,title,description,url,image_url,image_urls) VALUES(?,'manual-broadcast',?,?,?,?,?,?)")
+   .bind(eid,id,message.slice(0,70),message,"https://broadcast.ryouy.workers.dev/",image||null,JSON.stringify(imageUrls)).run();
   for(const platform of platforms){
    await env.DB.prepare("INSERT INTO deliveries(id,event_id,platform,text,image_url) VALUES(?,?,?,?,?)")
     .bind(uid(),eid,platform,message,image||null).run();
@@ -135,11 +139,14 @@ async function admin(req:Request,env:Env,url:URL){
   const [ ,id,action]=match;
   if(!safeId(id))return error("Invalid ID");
   if(action==="approve"){
-   const delivery=await env.DB.prepare("SELECT platform,image_url FROM deliveries WHERE id=? AND status='pending_review'").bind(id).first<{platform:string;image_url:string|null}>();
+   const delivery=await env.DB.prepare("SELECT d.platform,d.image_url,e.image_urls FROM deliveries d JOIN events e ON e.id=d.event_id WHERE d.id=? AND d.status='pending_review'").bind(id).first<{platform:string;image_url:string|null;image_urls:string|null}>();
    if(!delivery)return json({updated:0});
    if(delivery.platform==="x"&&!env.X_USER_ACCESS_TOKEN)return error("Xの連携が未設定です。投稿はまだできません",409);
    if(delivery.platform==="instagram"&&(!env.INSTAGRAM_ACCESS_TOKEN||!env.INSTAGRAM_USER_ID))return error("Instagramの連携が未設定です。投稿はまだできません",409);
    if(delivery.platform==="x"&&delivery.image_url)return error("Xへの画像投稿にはまだ対応していません",409);
+   let imageCount=delivery.image_url?1:0;
+   try{const parsed=JSON.parse(delivery.image_urls||"null");if(Array.isArray(parsed))imageCount=parsed.length;}catch{}
+   if(delivery.platform==="instagram"&&imageCount>1)return error("Instagramへの複数画像の投稿は準備中です。保存とプレビューは利用できます",409);
   }
   const result=await env.DB.prepare(action==="approve"?"UPDATE deliveries SET status='scheduled',scheduled_at=datetime('now') WHERE id=? AND status='pending_review'":"UPDATE deliveries SET status='skipped' WHERE id=? AND status IN ('pending_review','scheduled')").bind(id).run();
   return json({updated:result.meta.changes});
