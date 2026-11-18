@@ -1,0 +1,19 @@
+name: Publish Broadcast v0.1.1 for monitoring verification
+on:
+  push:
+    paths:
+      - .github/workflows/publish-monitor-check-release.yml
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish v0.1.1 once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view v0.1.1 >/dev/null 2>&1; then
+            gh release create v0.1.1 --target main --title "Broadcast v0.1.1" --notes "Google OAuth-only administrator authentication, streamlined dashboard controls, and GitHub Releases ingestion verification. This release is a monitoring test; SNS posting is not enabled."
+          fi
