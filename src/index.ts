@@ -3,7 +3,8 @@ import { authMode, callback, login, logout, sameOrigin, session } from "./auth";
 
 interface Env {
  DB: D1Database;
- MEDIA?: R2Bucket;
+ GITHUB_MEDIA_TOKEN?: string;
+ GITHUB_MEDIA_REPO?: string;
  GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; SESSION_SECRET?: string; ALLOWED_EMAILS?: string;
  X_USER_ACCESS_TOKEN?: string; INSTAGRAM_ACCESS_TOKEN?: string; INSTAGRAM_USER_ID?: string;
 }
@@ -59,14 +60,14 @@ async function admin(req:Request,env:Env,url:URL){
  if(req.method!=="GET"&&!sameOrigin(req))return error("Invalid request origin",403);
  if(req.method==="GET"&&url.pathname==="/api/status"){
   const counts=await env.DB.prepare("SELECT status,COUNT(*) AS count FROM deliveries GROUP BY status").all();
-  return json({ok:true,counts:counts.results,connections:{x:!!env.X_USER_ACCESS_TOKEN,instagram:!!(env.INSTAGRAM_ACCESS_TOKEN&&env.INSTAGRAM_USER_ID)},media_enabled:!!env.MEDIA});
+  return json({ok:true,counts:counts.results,connections:{x:!!env.X_USER_ACCESS_TOKEN,instagram:!!(env.INSTAGRAM_ACCESS_TOKEN&&env.INSTAGRAM_USER_ID)},media_enabled:!!env.GITHUB_MEDIA_TOKEN});
  }
  if(req.method==="GET"&&url.pathname==="/api/deliveries"){
   const rows=await env.DB.prepare("SELECT d.*,e.title,e.url AS source_url,s.name AS source_name,CASE WHEN s.id='manual-broadcast' THEN 1 ELSE 0 END AS is_manual FROM deliveries d JOIN events e ON e.id=d.event_id JOIN sources s ON s.id=e.source_id ORDER BY d.created_at DESC LIMIT 100").all();
   return json(rows.results);
  }
  if(req.method==="POST"&&url.pathname==="/api/media"){
-  if(!env.MEDIA)return error("画像保存の準備ができていません。Cloudflare R2を有効化してください",503);
+  if(!env.GITHUB_MEDIA_TOKEN)return error("画像保存用のGitHub認証が未設定です",503);
   const len=Number(req.headers.get("content-length")||0);
   if(len>8_000_000)return error("画像は8MB以内にしてください",413);
   const type=(req.headers.get("content-type")||"").split(";")[0].trim().toLowerCase();
@@ -82,9 +83,31 @@ async function admin(req:Request,env:Env,url:URL){
   const png=bytes.length>=8&&[137,80,78,71,13,10,26,10].every((b,i)=>bytes[i]===b);
   const webp=bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==="RIFF"&&String.fromCharCode(...bytes.slice(8,12))==="WEBP";
   if(!(type==="image/jpeg"&&jpeg||type==="image/png"&&png||type==="image/webp"&&webp))return error("画像形式が正しくありません",415);
+  // GitHub Contents API requires base64. Convert in chunks to avoid a large argument list.
+  const githubRepo=(env.GITHUB_MEDIA_REPO||"ryouy/broadcast").trim();
+  if(!/^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$/.test(githubRepo))return error("画像保存先の設定が不正です",503);
   const key=uid()+"."+extensions[type];
-  await env.MEDIA.put(key,bytes,{httpMetadata:{contentType:type},customMetadata:{source:"broadcast"}});
-  return json({url:"https://broadcast.ryouy.workers.dev/media/"+key,key},201);
+  const path="media/"+key;
+  let raw="";
+  for(let i=0;i<bytes.length;i+=32768)raw+=String.fromCharCode(...bytes.subarray(i,i+32768));
+  const encoded=btoa(raw);
+  const response=await fetch("https://api.github.com/repos/"+githubRepo+"/contents/"+path,{
+   method:"PUT",
+   headers:{
+    "authorization":"Bearer "+env.GITHUB_MEDIA_TOKEN,
+    "accept":"application/vnd.github+json",
+    "x-github-api-version":"2022-11-28",
+    "user-agent":"broadcast-media-uploader",
+    "content-type":"application/json"
+   },
+   body:JSON.stringify({message:"media: upload image from Broadcast",content:encoded,branch:"main"})
+  });
+  if(!response.ok){
+   console.error("GitHub media upload failed",response.status);
+   return error(response.status===401||response.status===403?"GitHubの画像保存権限を確認してください":response.status===413||response.status===422?"GitHubに画像を保存できませんでした。画像サイズを確認してください":"GitHubへの画像保存に失敗しました",502);
+  }
+  // Public repository: the raw file can be fetched by Instagram without credentials.
+  return json({url:"https://raw.githubusercontent.com/"+githubRepo+"/main/"+path,key},201);
  }
  if(req.method==="POST"&&url.pathname==="/api/posts"){
   const body:any=await req.json().catch(()=>null);
@@ -363,7 +386,7 @@ async function load(){
   connections=status.connections||{x:false,instagram:false};
   mediaEnabled=status.media_enabled===true;
   $("post-file").disabled=!mediaEnabled;
-  $("upload-help").textContent=mediaEnabled?"JPEG・PNG・WebP / 8MB以内":"画像の保存先を準備中です（Cloudflare R2が未設定）";
+  $("upload-help").textContent=mediaEnabled?"JPEG・PNG・WebP / 8MB以内":"画像保存用のGitHub認証が未設定です";
   renderQueue(items);
   notice("");
  }catch(e){notice("読み込みに失敗しました: "+String(e),true);}
@@ -409,7 +432,7 @@ function clearImagePreviewOnly(){
 async function uploadSelectedImage(){
  const file=$("post-file").files?.[0];
  if(!file)return "";
- if(!mediaEnabled)throw Error("画像アップロードを利用するにはCloudflare R2の有効化が必要です");
+ if(!mediaEnabled)throw Error("画像保存用のGitHub認証が未設定です");
  const response=await api("/api/media",{method:"POST",headers:{"content-type":file.type},body:file});
  if(typeof response.url!=="string")throw Error("画像アップロードに失敗しました");
  return response.url;
@@ -463,14 +486,6 @@ export default {
  async fetch(req:Request,env:Env):Promise<Response>{
   const url=new URL(req.url);
   try{
-   if(req.method==="GET"&&url.pathname.startsWith("/media/")){
-    const key=url.pathname.slice("/media/".length);
-    if(!/^[a-f0-9-]{36}\.(jpg|png|webp)$/.test(key))return error("Not found",404);
-    if(!env.MEDIA)return error("Not found",404);
-    const object=await env.MEDIA.get(key);
-    if(!object)return error("Not found",404);
-    return new Response(object.body,{headers:{"content-type":object.httpMetadata?.contentType||"application/octet-stream","cache-control":"public,max-age=31536000,immutable","x-content-type-options":"nosniff","content-disposition":"inline","access-control-allow-origin":"*"}});
-   }
    if(req.method==="GET"&&url.pathname==="/favicon.svg")return new Response(FAVICON_SVG,{headers:{"content-type":"image/svg+xml; charset=utf-8","cache-control":"public,max-age=86400","x-content-type-options":"nosniff"}});
    if(req.method==="GET"&&url.pathname==="/")return new Response(page,{headers:ACCESS_HEADERS});
    if(req.method==="GET"&&url.pathname==="/api/auth/config")return json({mode:authMode(env)});
