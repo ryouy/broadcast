@@ -71,10 +71,15 @@ async function poll(env:Env){
  const sources=await env.DB.prepare("SELECT * FROM sources WHERE enabled=1 LIMIT 30").all<Source>();
  for(const source of sources.results){
   try{
-   if(!httpUrl(source.url))continue;
+   if(!httpUrl(source.url))throw Error("Invalid source URL");
    if(source.type==="rss")await pollFeed(env,source);
    else if(source.type==="github")await pollGitHub(env,source);
-  }catch(e){console.error("Source poll failed",source.id,String(e));}
+   await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP,last_check_error=NULL WHERE id=?").bind(source.id).run();
+  }catch(e){
+   const message=String(e).slice(0,400);
+   console.error("Source poll failed",source.id,message);
+   await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP,last_check_error=? WHERE id=?").bind(message,source.id).run();
+  }
  }
 }
 // Public GitHub Releases API fallback: works without repository webhook admin rights.
@@ -139,7 +144,8 @@ async function admin(req:Request,env:Env,url:URL){
  if(req.method==="POST"&&url.pathname==="/api/check"){await poll(env);return json({ok:true});}
  if(req.method==="GET"&&url.pathname==="/api/status"){
   const counts=await env.DB.prepare("SELECT status,COUNT(*) AS count FROM deliveries GROUP BY status").all();
-  return json({ok:true,counts:counts.results});
+  const monitoring=await env.DB.prepare("SELECT last_cron_at,last_cron_error FROM monitoring_state WHERE id=1").first();
+  return json({ok:true,counts:counts.results,monitoring});
  }
  if(req.method==="GET"&&url.pathname==="/api/sources")return json((await env.DB.prepare("SELECT * FROM sources ORDER BY created_at DESC").all()).results);
  if(req.method==="GET"&&url.pathname==="/api/deliveries")return json((await env.DB.prepare("SELECT d.*,e.title,e.url AS source_url,s.name AS source_name FROM deliveries d JOIN events e ON e.id=d.event_id JOIN sources s ON s.id=e.source_id ORDER BY d.created_at DESC LIMIT 100").all()).results);
@@ -338,7 +344,8 @@ function renderSources(sources){
    const row=el("div","list-row");const ico=el("div","source-icon",s.type==="github"?"⌘":"↗");
    const rec=el("div","record");rec.append(el("div","record-title",s.name));
    const sub=el("div","record-sub");const a=el("a",null,s.url);a.href=s.url;a.target="_blank";a.rel="noopener noreferrer";sub.append(a);rec.append(sub);
-   const end=el("div","end");end.append(el("span","pill",s.enabled?"Active":"Paused"));
+   const end=el("div","end");end.append(el("span","pill "+(s.last_check_error?"failed":""),s.last_check_error?"Error":s.enabled?"Active":"Paused"));
+   if(s.last_check_error)rec.append(el("div","record-sub error-note",s.last_check_error));
    row.append(ico,rec,end);panel.append(row);
  }
 }
@@ -439,6 +446,13 @@ export default {
   }catch(e){console.error("Request failed",String(e));return error("Internal error",500);}
  },
  async scheduled(_event:ScheduledController,env:Env,ctx:ExecutionContext){
-  ctx.waitUntil((async()=>{await poll(env);await dispatch(env);})());
+  ctx.waitUntil((async()=>{
+   await env.DB.prepare("UPDATE monitoring_state SET last_cron_at=CURRENT_TIMESTAMP,last_cron_error=NULL WHERE id=1").run();
+   try{await poll(env);await dispatch(env);}
+   catch(e){
+    await env.DB.prepare("UPDATE monitoring_state SET last_cron_error=? WHERE id=1").bind(String(e).slice(0,400)).run();
+    throw e;
+   }
+  })());
  }
 };
